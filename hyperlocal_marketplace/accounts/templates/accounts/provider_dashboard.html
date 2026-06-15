@@ -1,0 +1,486 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Provider Dashboard | HyperLocal{% endblock %}
+
+{% block extra_css %}
+    .dashboard-nav-tabs .nav-link {
+        border: none;
+        color: var(--text-muted);
+        font-weight: 600;
+        padding: 12px 20px;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .dashboard-nav-tabs .nav-link.active {
+        background: var(--primary-gradient);
+        color: white;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+    }
+
+    .chat-box {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        height: 500px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+    }
+
+    .chat-header {
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 15px 20px;
+        display: flex;
+        align-items: center;
+    }
+
+    .chat-messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        background: #f8fafc;
+    }
+
+    .chat-message-bubble {
+        max-width: 70%;
+        padding: 10px 16px;
+        border-radius: 16px;
+        margin-bottom: 12px;
+        position: relative;
+        font-size: 0.9rem;
+    }
+
+    .chat-message-sent {
+        background: #4f46e5;
+        color: white;
+        align-self: flex-end;
+        margin-left: auto;
+        border-bottom-right-radius: 4px;
+    }
+
+    .chat-message-received {
+        background: white;
+        color: var(--text-dark);
+        border: 1px solid #e2e8f0;
+        align-self: flex-start;
+        margin-right: auto;
+        border-bottom-left-radius: 4px;
+    }
+
+    .chat-footer {
+        padding: 15px 20px;
+        background: white;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .chat-list-item {
+        padding: 15px;
+        border-bottom: 1px solid #f1f5f9;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
+
+    .chat-list-item:hover, .chat-list-item.active {
+        background: #f5f3ff;
+        border-left: 4px solid #4f46e5;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="row animate-fade-in">
+    <!-- Header -->
+    <div class="col-12 mb-4">
+        <div class="card-premium p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div>
+                <span class="text-uppercase text-xs text-muted font-semibold tracking-wider">Provider Portal</span>
+                <h2 class="mb-0 mt-1">Provider: {{ user.full_name }}</h2>
+                <p class="text-muted mb-0 small"><i class="bi bi-envelope me-1"></i>{{ user.email }} | <i class="bi bi-telephone me-1"></i>{{ user.phone_number }}</p>
+            </div>
+            <div>
+                <button type="button" class="btn btn-gradient-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#addServiceModal">
+                    <i class="bi bi-plus-circle me-1"></i>Add New Service
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="col-12 mb-4">
+        <ul class="nav nav-tabs border-0 dashboard-nav-tabs gap-2" id="providerTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="bookings-tab" data-bs-toggle="tab" data-bs-target="#bookings" type="button" role="tab" aria-controls="bookings" aria-selected="true">
+                    <i class="bi bi-calendar-check-fill me-2"></i>Bookings Request
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="services-tab" data-bs-toggle="tab" data-bs-target="#services" type="button" role="tab" aria-controls="services" aria-selected="false">
+                    <i class="bi bi-cone-striped me-2"></i>My Services
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat-section" type="button" role="tab" aria-controls="chat-section" aria-selected="false">
+                    <i class="bi bi-chat-dots-fill me-2"></i>Messages
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile" type="button" role="tab" aria-controls="profile" aria-selected="false">
+                    <i class="bi bi-person-bounding-box me-2"></i>Manage Profile
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Tab Contents -->
+    <div class="col-12">
+        <div class="tab-content" id="providerTabsContent">
+            
+            <!-- Bookings Tab -->
+            <div class="tab-pane fade show active" id="bookings" role="tabpanel" aria-labelledby="bookings-tab">
+                <div class="card-premium p-4">
+                    <h3 class="mb-4">Assigned Booking Requests</h3>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Customer</th>
+                                    <th>Service</th>
+                                    <th>Booking Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if bookings %}
+                                    {% for booking in bookings %}
+                                        <tr>
+                                            <td>#{{ booking.id }}</td>
+                                            <td>
+                                                <strong>{{ booking.customer.full_name }}</strong>
+                                                <div class="small text-muted">{{ booking.customer.phone_number }}</div>
+                                            </td>
+                                            <td>{{ booking.service.title }}</td>
+                                            <td>{{ booking.booking_date|date:"M d, Y - h:i A" }}</td>
+                                            <td>
+                                                {% if booking.status == 'PENDING' %}
+                                                    <span class="badge bg-warning text-dark">Pending</span>
+                                                {% elif booking.status == 'ACCEPTED' %}
+                                                    <span class="badge bg-primary">Accepted</span>
+                                                {% elif booking.status == 'REJECTED' %}
+                                                    <span class="badge bg-danger">Rejected</span>
+                                                {% elif booking.status == 'COMPLETED' %}
+                                                    <span class="badge bg-success">Completed</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="d-flex gap-2">
+                                                    <a href="?chat_with={{ booking.customer.id }}#chat-section" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('chat-tab').click();">
+                                                        <i class="bi bi-chat-text"></i> Chat
+                                                    </a>
+                                                    {% if booking.status == 'PENDING' %}
+                                                        <a href="{% url 'update_booking_status' booking.id 'ACCEPTED' %}" class="btn btn-success btn-sm">
+                                                            <i class="bi bi-check-lg"></i> Accept
+                                                        </a>
+                                                        <a href="{% url 'update_booking_status' booking.id 'REJECTED' %}" class="btn btn-danger btn-sm">
+                                                            <i class="bi bi-x-lg"></i> Reject
+                                                        </a>
+                                                    {% elif booking.status == 'ACCEPTED' %}
+                                                        <a href="{% url 'update_booking_status' booking.id 'COMPLETED' %}" class="btn btn-primary btn-sm">
+                                                            <i class="bi bi-check2-all"></i> Mark Completed
+                                                        </a>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4 text-muted">No booking requests assigned to you yet.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Services Tab -->
+            <div class="tab-pane fade" id="services" role="tabpanel" aria-labelledby="services-tab">
+                <div class="card-premium p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h3 class="mb-0">My Services List</h3>
+                        <button type="button" class="btn btn-gradient-primary rounded-pill btn-sm" data-bs-toggle="modal" data-bs-target="#addServiceModal">
+                            <i class="bi bi-plus-circle me-1"></i>Add New
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Price</th>
+                                    <th>Est. Duration</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if services %}
+                                    {% for s in services %}
+                                        <tr>
+                                            <td><strong>{{ s.title }}</strong></td>
+                                            <td class="text-muted small" style="max-width: 300px;">{{ s.description|truncatewords:20 }}</td>
+                                            <td>${{ s.price }}</td>
+                                            <td>{{ s.duration }} hr(s)</td>
+                                            <td>
+                                                <div class="d-flex gap-2">
+                                                    <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editServiceModal{{ s.id }}">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <a href="{% url 'delete_service' s.id %}" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this service?');">
+                                                        <i class="bi bi-trash"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Edit Service Modal -->
+                                        <div class="modal fade" id="editServiceModal{{ s.id }}" tabindex="-1" aria-labelledby="editServiceModalLabel{{ s.id }}" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content border-0 rounded-4 shadow-lg">
+                                                    <div class="modal-header border-0 bg-light rounded-top-4">
+                                                        <h5 class="modal-title" id="editServiceModalLabel{{ s.id }}">Edit Service</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <form action="{% url 'edit_service' s.id %}" method="POST">
+                                                        {% csrf_token %}
+                                                        <div class="modal-body p-4">
+                                                            <div class="mb-3">
+                                                                <label class="form-label font-semibold">Service Title</label>
+                                                                <input type="text" name="name" class="form-control" value="{{ s.name }}" required>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label font-semibold">Description</label>
+                                                                <textarea name="description" class="form-control" rows="3" required>{{ s.description }}</textarea>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label font-semibold">Price ($)</label>
+                                                                <input type="number" name="price" class="form-control" value="{{ s.price }}" step="0.01" required>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label font-semibold">Estimated Duration (hours)</label>
+                                                                <input type="number" name="duration_hours" class="form-control" value="{{ s.duration_hours }}" required>
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer border-0">
+                                                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-gradient-primary rounded-pill">Save Changes</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted">You haven't listed any services yet.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages/Chat Tab -->
+            <div class="tab-pane fade" id="chat-section" role="tabpanel" aria-labelledby="chat-tab">
+                <div class="row g-4">
+                    <!-- Customer List sidebar -->
+                    <div class="col-md-4">
+                        <div class="card-premium p-3">
+                            <h4 class="mb-3">Customers</h4>
+                            <div class="overflow-y-auto" style="max-height: 440px;">
+                                {% if customers %}
+                                    {% for c in customers %}
+                                        <a href="?chat_with={{ c.id }}#chat-section" class="chat-list-item {% if chat_partner.id == c.id %}active{% endif %} rounded-3">
+                                            <div class="d-flex align-items-center">
+                                                <div class="bg-indigo-100 text-indigo-700 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px; background-color: #e0e7ff; color: #4338ca;">
+                                                    <i class="bi bi-person-fill"></i>
+                                                </div>
+                                                <div>
+                                                    <h6 class="mb-0">{{ c.full_name }}</h6>
+                                                    <span class="text-muted small">Customer</span>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted text-center py-4">No customers available for chat.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Conversation Window -->
+                    <div class="col-md-8">
+                        {% if chat_partner %}
+                            <div class="chat-box">
+                                <div class="chat-header">
+                                    <div class="bg-indigo-100 text-indigo-700 rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px; background-color: #e0e7ff; color: #4338ca;">
+                                        <i class="bi bi-person-fill"></i>
+                                    </div>
+                                    <div>
+                                        <h5 class="mb-0">{{ chat_partner.full_name }}</h5>
+                                        <span class="text-muted small">Customer Chat</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="chat-messages d-flex flex-column" id="chat-messages-container">
+                                    {% if chat_messages %}
+                                        {% for msg in chat_messages %}
+                                            <div class="chat-message-bubble {% if msg.sender == request.user %}chat-message-sent{% else %}chat-message-received{% endif %}">
+                                                {{ msg.message }}
+                                                <div class="text-end small mt-1" style="font-size: 0.65rem; opacity: 0.8;">
+                                                    {{ msg.timestamp|date:"h:i A" }}
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="my-auto text-center text-muted">
+                                            <i class="bi bi-chat-left-text fs-1"></i>
+                                            <p class="mt-2">No messages yet. Send a message to start chatting!</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="chat-footer">
+                                    <form action="{% url 'send_chat_message' chat_partner.id %}" method="POST">
+                                        {% csrf_token %}
+                                        <div class="input-group">
+                                            <input type="text" name="message" class="form-control border-end-0 py-2" placeholder="Type a message..." required autocomplete="off">
+                                            <button type="submit" class="btn btn-gradient-primary px-4">
+                                                <i class="bi bi-send-fill"></i>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="card-premium p-5 text-center h-100 d-flex flex-column justify-content-center align-items-center">
+                                <i class="bi bi-chat-dots text-muted" style="font-size: 4rem;"></i>
+                                <h4 class="mt-3">Provider Chat Portal</h4>
+                                <p class="text-muted">Select a customer from the sidebar to view history or start chatting.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Tab -->
+            <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+                <div class="row">
+                    <div class="col-md-8 mx-auto">
+                        <div class="card-premium p-4">
+                            <h3 class="mb-4">Profile Settings</h3>
+                            <form action="" method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="update_profile" value="1">
+                                
+                                <div class="mb-3">
+                                    <label for="full_name" class="form-label">Full Name</label>
+                                    <input type="text" name="full_name" id="full_name" class="form-control" value="{{ user.full_name }}" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="phone_number" class="form-label">Phone Number</label>
+                                    <input type="text" name="phone_number" id="phone_number" class="form-control" value="{{ user.phone_number }}">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Email Address (Cannot change)</label>
+                                    <input type="email" class="form-control bg-light" value="{{ user.email }}" readonly>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-gradient-primary rounded-pill">
+                                    <i class="bi bi-save me-1"></i>Update Profile
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Add Service Modal -->
+<div class="modal fade" id="addServiceModal" tabindex="-1" aria-labelledby="addServiceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow-lg">
+            <div class="modal-header border-0 bg-light rounded-top-4">
+                <h5 class="modal-title" id="addServiceModalLabel">Add a New Service</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{% url 'add_service' %}" method="POST">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                            <div class="mb-3">
+                        <label class="form-label font-semibold">Service Title</label>
+                        {{ service_form.name }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label font-semibold">Description</label>
+                        {{ service_form.description }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label font-semibold">Price ($)</label>
+                        {{ service_form.price }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label font-semibold">Estimated Duration (hours)</label>
+                        {{ service_form.duration_hours }}
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-gradient-primary rounded-pill">Create Service</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var chatContainer = document.getElementById("chat-messages-container");
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        var hash = window.location.hash;
+        if (hash) {
+            var tabBtn = document.querySelector('button[data-bs-target="' + hash + '"]');
+            if (tabBtn) {
+                tabBtn.click();
+            }
+        }
+        
+        var tabButtons = document.querySelectorAll('button[data-bs-toggle="tab"]');
+        tabButtons.forEach(function(btn) {
+            btn.addEventListener('shown.bs.tab', function(event) {
+                window.location.hash = event.target.getAttribute('data-bs-target');
+            });
+        });
+    });
+</script>
+{% endblock %}

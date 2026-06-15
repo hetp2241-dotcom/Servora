@@ -1,0 +1,456 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Admin Dashboard | HyperLocal{% endblock %}
+
+{% block extra_css %}
+    .dashboard-nav-tabs .nav-link {
+        border: none;
+        color: var(--text-muted);
+        font-weight: 600;
+        padding: 12px 20px;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .dashboard-nav-tabs .nav-link.active {
+        background: var(--primary-gradient);
+        color: white;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+    }
+
+    .stat-card {
+        border-radius: 16px;
+        padding: 24px;
+        background: white;
+        border: 1px solid rgba(226, 232, 240, 0.8);
+        box-shadow: var(--card-shadow);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .stat-icon {
+        width: 54px;
+        height: 54px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+
+    .stat-icon-blue { background: #eff6ff; color: #2563eb; }
+    .stat-icon-green { background: #f0fdf4; color: #16a34a; }
+    .stat-icon-purple { background: #faf5ff; color: #7c3aed; }
+    .stat-icon-orange { background: #fff7ed; color: #ea580c; }
+{% endblock %}
+
+{% block content %}
+<div class="row animate-fade-in">
+    <!-- Header -->
+    <div class="col-12 mb-4">
+        <div class="card-premium p-4 d-flex justify-content-between align-items-center">
+            <div>
+                <span class="text-uppercase text-xs text-muted font-semibold tracking-wider">Platform Administration</span>
+                <h2 class="mb-0 mt-1">Platform Admin Center</h2>
+            </div>
+            <div>
+                <span class="role-badge role-admin">Superuser Console</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="col-12 mb-4">
+        <ul class="nav nav-tabs border-0 dashboard-nav-tabs gap-2" id="adminTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics" type="button" role="tab" aria-controls="analytics" aria-selected="true">
+                    <i class="bi bi-graph-up-arrow me-2"></i>Platform Analytics
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users-list" type="button" role="tab" aria-controls="users-list" aria-selected="false">
+                    <i class="bi bi-people-fill me-2"></i>User Management
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="bookings-tab" data-bs-toggle="tab" data-bs-target="#bookings-list" type="button" role="tab" aria-controls="bookings-list" aria-selected="false">
+                    <i class="bi bi-calendar-check-fill me-2"></i>Bookings
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="reviews-tab" data-bs-toggle="tab" data-bs-target="#reviews-list" type="button" role="tab" aria-controls="reviews-list" aria-selected="false">
+                    <i class="bi bi-star-fill me-2"></i>Reviews
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings-panel" type="button" role="tab" aria-controls="settings-panel" aria-selected="false">
+                    <i class="bi bi-gear-fill me-2"></i>System Settings
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Tab Contents -->
+    <div class="col-12">
+        <div class="tab-content" id="adminTabsContent">
+            
+            <!-- Analytics Tab -->
+            <div class="tab-pane fade show active" id="analytics" role="tabpanel" aria-labelledby="analytics-tab">
+                <!-- Stat Cards -->
+                <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4 mb-5">
+                    <div class="col">
+                        <div class="stat-card">
+                            <div>
+                                <span class="text-muted small block">Total Users</span>
+                                <h2 class="mb-0 mt-1">{{ analytics.total_users }}</h2>
+                                <span class="text-muted small">Customers: {{ analytics.total_customers }}</span>
+                            </div>
+                            <div class="stat-icon stat-icon-blue">
+                                <i class="bi bi-people"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col">
+                        <div class="stat-card">
+                            <div>
+                                <span class="text-muted small block">Active Providers</span>
+                                <h2 class="mb-0 mt-1">{{ analytics.total_providers }}</h2>
+                                <span class="text-muted small">Listed Marketplace Providers</span>
+                            </div>
+                            <div class="stat-icon stat-icon-purple">
+                                <i class="bi bi-briefcase"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col">
+                        <div class="stat-card">
+                            <div>
+                                <span class="text-muted small block">Total Bookings</span>
+                                <h2 class="mb-0 mt-1">{{ analytics.total_bookings }}</h2>
+                                <span class="text-muted small">Completed: {{ analytics.completed_bookings }}</span>
+                            </div>
+                            <div class="stat-icon stat-icon-orange">
+                                <i class="bi bi-calendar-event"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col">
+                        <div class="stat-card">
+                            <div>
+                                <span class="text-muted small block">Platform Earnings</span>
+                                <h2 class="mb-0 mt-1">${{ analytics.platform_earnings|floatformat:2 }}</h2>
+                                <span class="text-muted small">Commission Rate: {{ commission_rate }}%</span>
+                            </div>
+                            <div class="stat-icon stat-icon-green">
+                                <i class="bi bi-cash-stack"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-charts or metrics breakdown -->
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="card-premium p-4 h-100">
+                            <h3>Booking Status Breakdown</h3>
+                            <p class="text-muted small mb-4">Current state of booking operations across the platform.</p>
+                            
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="small font-semibold">Completed Bookings ({{ analytics.completed_bookings }})</span>
+                                    <span class="small font-semibold">{% widthratio analytics.completed_bookings analytics.total_bookings 100 as comp_pct %}{{ comp_pct }}%</span>
+                                </div>
+                                <div class="progress rounded-pill" style="height: 10px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: {% widthratio analytics.completed_bookings analytics.total_bookings 100 %}%;"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="small font-semibold">Accepted / Active ({{ analytics.accepted_bookings }})</span>
+                                    <span class="small font-semibold">{% widthratio analytics.accepted_bookings analytics.total_bookings 100 as acc_pct %}{{ acc_pct }}%</span>
+                                </div>
+                                <div class="progress rounded-pill" style="height: 10px;">
+                                    <div class="progress-bar bg-primary" role="progressbar" style="width: {% widthratio analytics.accepted_bookings analytics.total_bookings 100 %}%;"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span class="small font-semibold">Pending Requests ({{ analytics.pending_bookings }})</span>
+                                    <span class="small font-semibold">{% widthratio analytics.pending_bookings analytics.total_bookings 100 as pend_pct %}{{ pend_pct }}%</span>
+                                </div>
+                                <div class="progress rounded-pill" style="height: 10px;">
+                                    <div class="progress-bar bg-warning" role="progressbar" style="width: {% widthratio analytics.pending_bookings analytics.total_bookings 100 %}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card-premium p-4 h-100">
+                            <h3>Marketplace Quality Rating</h3>
+                            <p class="text-muted small mb-4">Rating averages based on completed service review comments.</p>
+                            <div class="text-center py-4">
+                                <h1 class="display-3 font-extrabold text-indigo-700" style="color: #4f46e5;">{{ analytics.avg_rating }}</h1>
+                                <div class="fs-4 text-warning mb-2">
+                                    {% if analytics.avg_rating >= 4.5 %}
+                                        ⭐⭐⭐⭐⭐
+                                    {% elif analytics.avg_rating >= 3.5 %}
+                                        ⭐⭐⭐⭐
+                                    {% elif analytics.avg_rating >= 2.5 %}
+                                        ⭐⭐⭐
+                                    {% elif analytics.avg_rating >= 1.5 %}
+                                        ⭐⭐
+                                    {% elif analytics.avg_rating > 0 %}
+                                        ⭐
+                                    {% else %}
+                                        No reviews
+                                    {% endif %}
+                                </div>
+                                <p class="text-muted mb-0 small">Average provider score based on customer reviews</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users List Tab -->
+            <div class="tab-pane fade" id="users-list" role="tabpanel" aria-labelledby="users-tab">
+                <div class="card-premium p-4">
+                    <h3 class="mb-4">Global Users Registry</h3>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if users %}
+                                    {% for u in users %}
+                                        <tr>
+                                            <td><strong>{{ u.full_name }}</strong></td>
+                                            <td>{{ u.email }}</td>
+                                            <td>{{ u.phone_number|default:"N/A" }}</td>
+                                            <td>
+                                                {% if u.role == 'ADMIN' %}
+                                                    <span class="badge bg-danger">Admin</span>
+                                                {% elif u.role == 'PROVIDER' %}
+                                                    <span class="badge bg-success">Provider</span>
+                                                {% else %}
+                                                    <span class="badge bg-primary">Customer</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if u.is_active %}
+                                                    <span class="badge bg-success">Active</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">Suspended</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if u != request.user %}
+                                                    <a href="{% url 'admin_toggle_user' u.id %}" class="btn {% if u.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %} btn-sm">
+                                                        {% if u.is_active %}<i class="bi bi-lock"></i> Deactivate{% else %}<i class="bi bi-unlock"></i> Activate{% endif %}
+                                                    </a>
+                                                {% else %}
+                                                    <span class="text-muted small">You (Current User)</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4 text-muted">No users found in database.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bookings List Tab -->
+            <div class="tab-pane fade" id="bookings-list" role="tabpanel" aria-labelledby="bookings-tab">
+                <div class="card-premium p-4">
+                    <h3 class="mb-4">All Platform Bookings</h3>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Customer</th>
+                                    <th>Service</th>
+                                    <th>Provider</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Action Override</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if bookings %}
+                                    {% for b in bookings %}
+                                        <tr>
+                                            <td>#{{ b.id }}</td>
+                                            <td><strong>{{ b.customer.full_name }}</strong></td>
+                                            <td>{{ b.service.title }}</td>
+                                            <td>{{ b.provider.full_name }}</td>
+                                            <td>{{ b.booking_date|date:"M d, Y - h:i A" }}</td>
+                                            <td>
+                                                {% if b.status == 'PENDING' %}
+                                                    <span class="badge bg-warning text-dark">Pending</span>
+                                                {% elif b.status == 'ACCEPTED' %}
+                                                    <span class="badge bg-primary">Accepted</span>
+                                                {% elif b.status == 'REJECTED' %}
+                                                    <span class="badge bg-danger">Rejected</span>
+                                                {% elif b.status == 'COMPLETED' %}
+                                                    <span class="badge bg-success">Completed</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if b.status != 'COMPLETED' and b.status != 'REJECTED' %}
+                                                    <div class="dropdown">
+                                                        <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                            Modify
+                                                        </button>
+                                                        <ul class="dropdown-menu">
+                                                            <li><a class="dropdown-menu-item dropdown-item" href="{% url 'update_booking_status' b.id 'ACCEPTED' %}">Accept</a></li>
+                                                            <li><a class="dropdown-menu-item dropdown-item text-danger" href="{% url 'update_booking_status' b.id 'REJECTED' %}">Reject</a></li>
+                                                            <li><a class="dropdown-menu-item dropdown-item text-success" href="{% url 'update_booking_status' b.id 'COMPLETED' %}">Complete</a></li>
+                                                        </ul>
+                                                    </div>
+                                                {% else %}
+                                                    <span class="text-muted small">Locked</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">No bookings made on the platform yet.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reviews Tab -->
+            <div class="tab-pane fade" id="reviews-list" role="tabpanel" aria-labelledby="reviews-tab">
+                <div class="card-premium p-4">
+                    <h3 class="mb-4">Customer Reviews</h3>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Rating</th>
+                                    <th>Customer</th>
+                                    <th>Provider</th>
+                                    <th>Comment</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if reviews %}
+                                    {% for r in reviews %}
+                                        <tr>
+                                            <td>
+                                                <span class="text-warning font-semibold">
+                                                    {% if r.rating == 5 %}⭐⭐⭐⭐⭐{% elif r.rating == 4 %}⭐⭐⭐⭐{% elif r.rating == 3 %}⭐⭐⭐{% elif r.rating == 2 %}⭐⭐{% else %}⭐{% endif %}
+                                                </span>
+                                                <span class="small">({{ r.rating }}/5)</span>
+                                            </td>
+                                            <td><strong>{{ r.customer.full_name }}</strong></td>
+                                            <td>{{ r.provider.full_name }}</td>
+                                            <td class="text-muted small" style="max-width: 300px;">"{{ r.comment }}"</td>
+                                            <td>{{ r.created_at|date:"M d, Y" }}</td>
+                                            <td>
+                                                <a href="{% url 'admin_delete_review' r.id %}" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure you want to delete this review?');">
+                                                    <i class="bi bi-trash"></i> Delete
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4 text-muted">No reviews written on the platform yet.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Platform Settings Panel -->
+            <div class="tab-pane fade" id="settings-panel" role="tabpanel" aria-labelledby="settings-tab">
+                <div class="row">
+                    <div class="col-md-8 mx-auto">
+                        <div class="card-premium p-4">
+                            <h3 class="mb-4">System Configurations</h3>
+                            <form action="" method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="update_settings" value="1">
+                                
+                                <div class="mb-4">
+                                    <label for="commission_rate" class="form-label font-semibold">Marketplace Commission Fee (%)</label>
+                                    <div class="input-group">
+                                        <input type="number" step="0.1" name="commission_rate" id="commission_rate" class="form-control" value="{{ commission_rate }}" required>
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                    <div class="form-text small text-muted">This commission percentage is deducted from provider earnings to calculate platform earnings.</div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label font-semibold">Platform Database Mode</label>
+                                    <select class="form-select bg-light" disabled>
+                                        <option>SQLite (Local Development Sandbox)</option>
+                                    </select>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-gradient-primary rounded-pill">
+                                    <i class="bi bi-save me-1"></i>Save System Configurations
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var hash = window.location.hash;
+        if (hash) {
+            var tabBtn = document.querySelector('button[data-bs-target="' + hash + '"]');
+            if (tabBtn) {
+                tabBtn.click();
+            }
+        }
+        
+        var tabButtons = document.querySelectorAll('button[data-bs-toggle="tab"]');
+        tabButtons.forEach(function(btn) {
+            btn.addEventListener('shown.bs.tab', function(event) {
+                window.location.hash = event.target.getAttribute('data-bs-target');
+            });
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}{{ profile.full_name }} | Provider Profile{% endblock %}
+
+{% block content %}
+<div class="row animate-fade-in">
+    <div class="col-12 mb-4">
+        <div class="hero-card p-5 d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
+            <div>
+                <span class="text-uppercase text-xs text-muted">Provider Profile</span>
+                <h1 class="mt-2 mb-2">{{ profile.full_name }}</h1>
+                <p class="text-muted mb-1">{{ profile.city }}{% if profile.city and profile.address %}, {% endif %}{{ profile.address }}</p>
+                <p class="text-muted">{{ profile.description|default:'Professional profile not completed yet.' }}</p>
+            </div>
+            <div class="text-lg-end">
+                <a href="{% url 'service_list' %}" class="btn btn-outline-secondary rounded-pill mb-2">Back to Services</a>
+                {% if profile.user.services.first %}
+                    <a href="{% url 'service_detail' profile.user.services.first.pk %}" class="btn btn-gradient-primary rounded-pill">View Latest Service</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4 mb-4">
+        <div class="card-premium p-4 text-center">
+            {% if profile.profile_picture %}
+                <img src="{{ profile.profile_picture.url }}" alt="{{ profile.full_name }}" class="rounded-circle mb-3" style="width: 130px; height: 130px; object-fit: cover;">
+            {% else %}
+                <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mb-3" style="width: 130px; height: 130px;">
+                    <i class="bi bi-person-circle fs-1 text-muted"></i>
+                </div>
+            {% endif %}
+            <h4 class="mb-1">{{ profile.full_name }}</h4>
+            <p class="text-muted small mb-3">{{ profile.user.email }}</p>
+            <div class="d-flex flex-column gap-3 text-start">
+                <div>
+                    <h6 class="text-muted mb-1">Experience</h6>
+                    <p class="mb-0">{{ profile.experience_years }} years</p>
+                </div>
+                <div>
+                    <h6 class="text-muted mb-1">Verified</h6>
+                    <p class="mb-0">{{ profile.is_verified|yesno:"Yes,No" }}</p>
+                </div>
+                <div>
+                    <h6 class="text-muted mb-1">Profile Score</h6>
+                    <p class="mb-0">{{ profile.completion_percentage }}%</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8 mb-4">
+        <div class="card-premium p-4">
+            <h4 class="mb-4">About {{ profile.full_name }}</h4>
+            <p class="text-muted">{{ profile.description|default:'No description available yet.' }}</p>
+            <hr>
+            <div class="row gy-3">
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-1">Phone</h6>
+                    <p class="mb-0">{{ profile.phone_number|default:'Not provided' }}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-1">City</h6>
+                    <p class="mb-0">{{ profile.city|default:'Not provided' }}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-1">Address</h6>
+                    <p class="mb-0">{{ profile.address|default:'Not provided' }}</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-1">Verified Provider</h6>
+                    <p class="mb-0">{{ profile.is_verified|yesno:"Yes,No" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-premium p-4 mt-4">
+            <h4 class="mb-4">Services by {{ profile.full_name }}</h4>
+            {% if services %}
+                <div class="row row-cols-1 row-cols-md-2 g-4">
+                    {% for service in services %}
+                        <div class="col">
+                            <div class="service-card h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start mb-3">
+                                        <span class="badge bg-secondary bg-opacity-15 text-secondary rounded-pill py-2 px-3">{{ service.duration }} hr</span>
+                                        <span class="text-muted small">${{ service.price }}</span>
+                                    </div>
+                                    <h5 class="mb-2">{{ service.title }}</h5>
+                                    <p class="text-muted small flex-grow-1">{{ service.description|truncatewords:18 }}</p>
+                                    <a href="{% url 'service_detail' service.pk %}" class="btn btn-outline-primary btn-sm rounded-pill mt-3 align-self-start">View Service</a>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted">This provider has not listed any services yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

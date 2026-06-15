@@ -1,0 +1,295 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Discover Services | HyperLocal{% endblock %}
+
+{% block extra_css %}
+    .filter-card {
+        border-radius: 24px;
+        border: 1px solid rgba(226, 232, 240, 0.95);
+        background: #ffffff;
+    }
+
+    .filter-panel-toggle {
+        border-radius: 18px;
+        padding: 0.9rem 1.2rem;
+    }
+
+    .active-filter-badge {
+        background: rgba(124, 58, 237, 0.08);
+        color: #4f46e5;
+        border-radius: 999px;
+        padding: 0.55rem 0.95rem;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .active-filter-badge a {
+        color: #4f46e5;
+    }
+
+    .service-list-header {
+        gap: 1rem;
+    }
+
+    .service-count {
+        font-size: 0.95rem;
+        color: #475569;
+    }
+
+    @media (max-width: 991px) {
+        .desktop-filters {
+            display: none !important;
+        }
+    }
+
+    @media (min-width: 992px) {
+        .mobile-filters {
+            display: none !important;
+        }
+    }
+{% endblock %}
+
+{% block content %}
+<div class="row animate-fade-in">
+    <div class="col-12 mb-4">
+        <div class="hero-card p-5">
+            <div class="row align-items-center gy-4">
+                <div class="col-lg-7">
+                    <span class="text-uppercase text-xs text-muted">Advanced Marketplace Search</span>
+                    <h1 class="mt-2 mb-3">Find the right service provider for every home task.</h1>
+                    <p class="text-muted lead">Search by service, provider, category, or city. Filter by price, experience, verification, and availability.</p>
+                </div>
+                <div class="col-lg-5 text-lg-end">
+                    <a href="#filters" class="btn btn-gradient-secondary filter-panel-toggle mobile-filters" data-bs-toggle="offcanvas" data-bs-target="#mobileFilters" aria-controls="mobileFilters">
+                        <i class="bi bi-funnel-fill me-2"></i>Open Filters
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 mb-3">
+        <div class="card-premium p-4 d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center service-list-header">
+            <div>
+                <small class="text-uppercase text-muted">Search</small>
+                <h2 class="mt-1 mb-2">Browse services</h2>
+                <p class="service-count mb-0">Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} services</p>
+            </div>
+            <form class="row gy-2 gx-2 align-items-center mb-0" method="get">
+                <div class="col-12 col-md-7">
+                    {{ filter_form.search }}
+                </div>
+                <div class="col-12 col-md-4">
+                    {{ filter_form.sort_by }}
+                </div>
+                <div class="col-12 col-md-auto">
+                    <button type="submit" class="btn btn-gradient-primary w-100 rounded-pill">Search</button>
+                </div>
+                {% if request.GET.category %}
+                    <input type="hidden" name="category" value="{{ request.GET.category }}">
+                {% endif %}
+                {% if request.GET.city %}
+                    <input type="hidden" name="city" value="{{ request.GET.city }}">
+                {% endif %}
+                {% if request.GET.min_price %}
+                    <input type="hidden" name="min_price" value="{{ request.GET.min_price }}">
+                {% endif %}
+                {% if request.GET.max_price %}
+                    <input type="hidden" name="max_price" value="{{ request.GET.max_price }}">
+                {% endif %}
+                {% if request.GET.experience %}
+                    <input type="hidden" name="experience" value="{{ request.GET.experience }}">
+                {% endif %}
+                {% if request.GET.verified_only %}
+                    <input type="hidden" name="verified_only" value="{{ request.GET.verified_only }}">
+                {% endif %}
+                {% if request.GET.available_only %}
+                    <input type="hidden" name="available_only" value="{{ request.GET.available_only }}">
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <div class="col-12 mb-3">
+        {% if active_filters %}
+            <div class="card-premium p-3 d-flex flex-wrap align-items-center gap-2">
+                <strong class="text-muted">Active filters:</strong>
+                {% for filter in active_filters %}
+                    <span class="active-filter-badge">
+                        {{ filter.label }}
+                        <a href="{{ filter.url }}" class="text-decoration-none">&times;</a>
+                    </span>
+                {% endfor %}
+                <a href="{% url 'service_list' %}" class="btn btn-sm btn-outline-secondary rounded-pill ms-auto">Clear all</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-3 desktop-filters mb-4">
+        <div class="filter-card p-4">
+            <h5 class="mb-4">Filter results</h5>
+            <form method="get" action="">
+                <div class="mb-3">
+                    <label class="form-label">Category</label>
+                    {{ filter_form.category }}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">City</label>
+                    {{ filter_form.city }}
+                </div>
+                <div class="row gx-2">
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Min Price</label>
+                        {{ filter_form.min_price }}
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label">Max Price</label>
+                        {{ filter_form.max_price }}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Experience</label>
+                    {{ filter_form.experience }}
+                </div>
+                <div class="form-check mb-3">
+                    {{ filter_form.verified_only }}
+                    <label class="form-check-label" for="id_verified_only">Verified providers only</label>
+                </div>
+                <div class="form-check mb-4">
+                    {{ filter_form.available_only }}
+                    <label class="form-check-label" for="id_available_only">Available services only</label>
+                </div>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-gradient-primary rounded-pill">Apply filters</button>
+                    <a href="{% url 'service_list' %}" class="btn btn-outline-secondary rounded-pill">Clear filters</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-9">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+            {% if services %}
+                {% for service in services %}
+                    <div class="col">
+                        <div class="service-card h-100 d-flex flex-column">
+                            {% if service.image %}
+                                <img src="{{ service.image.url }}" class="card-img-top" alt="{{ service.title }}" style="height: 260px; object-fit: cover;">
+                            {% else %}
+                                <div class="bg-light d-flex align-items-center justify-content-center" style="height: 260px;">
+                                    <i class="bi bi-briefcase-fill fs-1 text-muted"></i>
+                                </div>
+                            {% endif %}
+                            <div class="card-body d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="badge bg-secondary bg-opacity-15 text-secondary rounded-pill py-2 px-3">{% if service.category %}{{ service.category.name }}{% else %}General{% endif %}</span>
+                                    <span class="rating-pill">{{ service.duration }} hr</span>
+                                </div>
+                                <h4 class="mb-2">{{ service.title }}</h4>
+                                <p class="text-muted small mb-2">By <strong>{{ service.provider.full_name }}</strong></p>
+                                <p class="text-muted small flex-grow-1">{{ service.description|truncatewords:22 }}</p>
+                                <div class="mt-4 d-flex justify-content-between align-items-center gap-3">
+                                    <div>
+                                        <span class="text-muted small">Starts at</span>
+                                        <p class="mb-0 fs-5 fw-semibold">₹{{ service.price }}</p>
+                                    </div>
+                                    <a href="{% url 'service_detail' service.pk %}" class="btn btn-gradient-primary btn-sm rounded-pill">View</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-12">
+                    <div class="card-premium p-5 text-center">
+                        <i class="bi bi-search fs-1 text-muted"></i>
+                        <h4 class="mt-3">No services match your filters</h4>
+                        <p class="text-muted mb-4">Adjust your search or clear filters to discover more service providers.</p>
+                        <a href="{% url 'service_list' %}" class="btn btn-gradient-primary rounded-pill">Clear filters</a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if is_paginated and services %}
+            <div class="mt-4">
+                <nav aria-label="Service pagination">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">Previous</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">Previous</span></li>
+                        {% endif %}
+                        <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">Next</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">Next</span></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="offcanvas offcanvas-start" tabindex="-1" id="mobileFilters" aria-labelledby="mobileFiltersLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="mobileFiltersLabel">Refine search</h5>
+        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <form method="get" action="">
+            <div class="mb-3">
+                <label class="form-label">Search</label>
+                {{ filter_form.search }}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Sort by</label>
+                {{ filter_form.sort_by }}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Category</label>
+                {{ filter_form.category }}
+            </div>
+            <div class="mb-3">
+                <label class="form-label">City</label>
+                {{ filter_form.city }}
+            </div>
+            <div class="row gx-2">
+                <div class="col-6 mb-3">
+                    <label class="form-label">Min Price</label>
+                    {{ filter_form.min_price }}
+                </div>
+                <div class="col-6 mb-3">
+                    <label class="form-label">Max Price</label>
+                    {{ filter_form.max_price }}
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Experience</label>
+                {{ filter_form.experience }}
+            </div>
+            <div class="form-check mb-3">
+                {{ filter_form.verified_only }}
+                <label class="form-check-label" for="id_verified_only">Verified providers only</label>
+            </div>
+            <div class="form-check mb-3">
+                {{ filter_form.available_only }}
+                <label class="form-check-label" for="id_available_only">Available services only</label>
+            </div>
+            <div class="d-grid gap-2">
+                <button type="submit" class="btn btn-gradient-primary rounded-pill">Apply filters</button>
+                <a href="{% url 'service_list' %}" class="btn btn-outline-secondary rounded-pill">Clear filters</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

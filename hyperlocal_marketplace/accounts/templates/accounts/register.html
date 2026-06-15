@@ -1,0 +1,298 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Create Account | HyperLocal{% endblock %}
+
+{% block extra_css %}
+    body {
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    }
+    
+    .register-card {
+        max-width: 600px;
+        margin: 30px auto;
+        padding: 40px;
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08);
+    }
+    
+    .register-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+    
+    .register-logo {
+        width: 50px;
+        height: 50px;
+        background: var(--primary-gradient);
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 15px;
+        color: white;
+        font-size: 1.5rem;
+        box-shadow: 0 8px 16px rgba(79, 70, 229, 0.25);
+    }
+
+    .form-group-custom {
+        margin-bottom: 20px;
+    }
+
+    .form-group-custom label {
+        font-weight: 500;
+        font-size: 0.875rem;
+        color: var(--text-dark);
+        margin-bottom: 6px;
+        display: block;
+    }
+
+    .form-control {
+        height: 48px;
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .form-control:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+    }
+
+    /* Role selection cards styling */
+    .role-cards-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-top: 8px;
+    }
+
+    .role-card-wrapper {
+        position: relative;
+    }
+
+    .role-card-wrapper input[type="radio"] {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .role-card-label {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px 15px;
+        border: 2px solid #e2e8f0;
+        border-radius: 14px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        text-align: center;
+        height: 100%;
+    }
+
+    .role-card-label i {
+        font-size: 2rem;
+        margin-bottom: 10px;
+        color: var(--text-muted);
+        transition: color 0.2s ease;
+    }
+
+    .role-card-title {
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--text-dark);
+        margin-bottom: 4px;
+    }
+
+    .role-card-desc {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-bottom: 0;
+    }
+
+    /* Active states */
+    .role-card-wrapper input[type="radio"]:checked + .role-card-label {
+        border-color: #4f46e5;
+        background: #f5f3ff;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.08);
+    }
+
+    .role-card-wrapper input[type="radio"]:checked + .role-card-label i {
+        color: #4f46e5;
+    }
+
+    .role-card-wrapper input[type="radio"]:focus + .role-card-label {
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+    }
+
+    .btn-register {
+        height: 50px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 1rem;
+        letter-spacing: 0.2px;
+        margin-top: 10px;
+    }
+
+    .login-prompt {
+        text-align: center;
+        margin-top: 25px;
+        padding-top: 15px;
+        border-top: 1px solid #e2e8f0;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    .login-prompt a {
+        font-weight: 700;
+        color: #4f46e5;
+        text-decoration: none;
+    }
+
+    .login-prompt a:hover {
+        text-decoration: underline;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12">
+        <div class="register-card animate-fade-in">
+            <div class="register-header">
+                <div class="register-logo">
+                    <i class="bi bi-geo-alt-fill"></i>
+                </div>
+                <h2 class="mb-1">Create an account</h2>
+                <p class="text-muted">Join HyperLocal to discover or offer services</p>
+            </div>
+
+            <form method="POST" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger py-2 px-3 mb-4 rounded-3 small">
+                        {% for error in form.non_field_errors %}
+                            <p class="mb-0"><i class="bi bi-exclamation-circle me-2"></i>{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <!-- Full Name -->
+                <div class="form-group-custom">
+                    <label for="id_full_name">Full Name</label>
+                    {{ form.full_name }}
+                    {% if form.full_name.errors %}
+                        <div class="text-danger small mt-1">
+                            {% for error in form.full_name.errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="row">
+                    <!-- Email Address -->
+                    <div class="col-md-6 form-group-custom">
+                        <label for="id_email">Email Address</label>
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.email.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Phone Number -->
+                    <div class="col-md-6 form-group-custom">
+                        <label for="id_phone_number">Phone Number</label>
+                        {{ form.phone_number }}
+                        {% if form.phone_number.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.phone_number.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Password and Confirm Password fields -->
+                {% for field in form %}
+                    {% if field.name == 'password' or field.name == 'password1' or field.name == 'password2' %}
+                        <div class="form-group-custom">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            <input type="{{ field.field.widget.input_type }}" 
+                                   name="{{ field.html_name }}" 
+                                   id="{{ field.id_for_label }}" 
+                                   class="form-control" 
+                                   placeholder="••••••••"
+                                   required>
+                            {% if field.help_text %}
+                                <div class="text-muted small mt-1" style="font-size: 0.75rem;">{{ field.help_text|safe }}</div>
+                            {% endif %}
+                            {% if field.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in field.errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+
+                <!-- Role Selection -->
+                <div class="form-group-custom">
+                    <label class="mb-2">Select Your Role</label>
+                    <div class="role-cards-container">
+                        <!-- Customer Card -->
+                        <div class="role-card-wrapper">
+                            <input type="radio" name="role" id="role_customer" value="CUSTOMER" checked>
+                            <label for="role_customer" class="role-card-label">
+                                <i class="bi bi-people-fill"></i>
+                                <span class="role-card-title">Customer</span>
+                                <p class="role-card-desc">Find and book local service providers</p>
+                            </label>
+                        </div>
+                        
+                        <!-- Provider Card -->
+                        <div class="role-card-wrapper">
+                            <input type="radio" name="role" id="role_provider" value="PROVIDER">
+                            <label for="role_provider" class="role-card-label">
+                                <i class="bi bi-briefcase-fill"></i>
+                                <span class="role-card-title">Service Provider</span>
+                                <p class="role-card-desc">Manage services and get customer bookings</p>
+                            </label>
+                        </div>
+                    </div>
+                    {% if form.role.errors %}
+                        <div class="text-danger small mt-1">
+                            {% for error in form.role.errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn btn-gradient-primary w-100 btn-register">
+                    Create Free Account
+                </button>
+            </form>
+
+            <!-- Login Prompt -->
+            <div class="login-prompt">
+                Already have an account? <a href="{% url 'login' %}">Sign In</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
