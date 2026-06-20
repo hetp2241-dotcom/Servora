@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AuthenticationForm
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from .models import Category, ProviderProfile, Service, Booking, Review
 
 User = get_user_model()
@@ -116,12 +117,26 @@ class ServiceForm(forms.ModelForm):
 
 
 class BookingForm(forms.ModelForm):
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(
+            attrs={'class': 'form-control', 'placeholder': 'Add any details or special notes for the provider', 'rows': 3}
+        ),
+        label='Additional Notes',
+    )
+
     class Meta:
         model = Booking
-        fields = ['booking_date']
+        fields = ['booking_date', 'notes']
         widgets = {
             'booking_date': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
         }
+
+    def clean_booking_date(self):
+        booking_date = self.cleaned_data.get('booking_date')
+        if booking_date and booking_date <= timezone.now():
+            raise forms.ValidationError('Please select a future date and time for the booking.')
+        return booking_date
 
 
 class ReviewForm(forms.ModelForm):

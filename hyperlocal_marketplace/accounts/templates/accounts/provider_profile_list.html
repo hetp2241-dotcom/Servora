@@ -27,11 +27,11 @@
                 <div class="card-premium h-100 p-4 d-flex flex-column justify-content-between">
                     <div>
                         <div class="d-flex align-items-center gap-3 mb-3">
-                            <div class="rounded-circle bg-secondary bg-opacity-10 d-flex align-items-center justify-content-center" style="width: 64px; height: 64px;">
-                                {% if profile.profile_picture %}
-                                    <img src="{{ profile.profile_picture.url }}" alt="{{ profile.full_name }}" class="rounded-circle" style="width: 64px; height: 64px; object-fit: cover;">
+                            <div class="rounded-circle bg-secondary bg-opacity-10 overflow-hidden" style="width: 64px; height: 64px;">
+                                {% if profile.profile_picture_url %}
+                                    <img src="{{ profile.profile_picture_url }}" alt="{{ profile.full_name }}" class="rounded-circle" style="width: 64px; height: 64px; object-fit: cover;">
                                 {% else %}
-                                    <i class="bi bi-person-circle fs-2 text-secondary"></i>
+                                    <div class="bg-primary text-white d-flex align-items-center justify-content-center w-100 h-100">{{ profile.full_name|slice:":1" }}</div>
                                 {% endif %}
                             </div>
                             <div>

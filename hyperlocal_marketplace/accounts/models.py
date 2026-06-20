@@ -1,8 +1,20 @@
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils.translation import gettext_lazy as _
 from django.db.models.signals import post_migrate, post_save
 from django.dispatch import receiver
+
+CATEGORY_IMAGE_FILENAMES = {
+    'Plumber': 'service_images/plumber.jpg',
+    'Electrician': 'service_images/electrician.jpg',
+    'Carpenter': 'service_images/carpenter.jpg',
+    'Cleaner': 'service_images/cleaner.jpg',
+    'Painter': 'service_images/painter.jpg',
+    'AC Repair': 'service_images/ac_repair.jpg',
+    'Appliance Repair': 'service_images/appliance_repair.jpg',
+}
+DEFAULT_SERVICE_IMAGE = 'service_images/service_default.jpg'
 
 
 class CustomUserManager(BaseUserManager):
@@ -80,6 +92,32 @@ class Category(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def image_filename(self):
+        return CATEGORY_IMAGE_FILENAMES.get(self.name, DEFAULT_SERVICE_IMAGE)
+
+    @property
+    def image_url(self):
+        """URL for the category image.
+
+        Notes:
+        - In this project category images are downloaded into MEDIA_ROOT/service_images/.
+        - Some category filenames may not exist (e.g. if image download failed). In that case
+          fall back to DEFAULT_SERVICE_IMAGE to avoid broken <img> tags.
+        """
+        filename = self.image_filename
+
+        # If expected file is missing, fall back to default so templates never point to a 404.
+        expected_path = (settings.MEDIA_ROOT / filename) if hasattr(settings, 'MEDIA_ROOT') else None
+        if expected_path and not expected_path.exists():
+            filename = DEFAULT_SERVICE_IMAGE
+
+        return f"{settings.MEDIA_URL}{filename}"
+
+
+
+
+
 
 class ProviderProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='provider_profile')
@@ -98,6 +136,12 @@ class ProviderProfile(models.Model):
 
     def __str__(self):
         return self.full_name or self.user.full_name
+
+    @property
+    def profile_picture_url(self):
+        if self.profile_picture:
+            return self.profile_picture.url
+        return ''
 
     @property
     def completion_percentage(self):
@@ -147,6 +191,14 @@ class Service(models.Model):
     def duration(self):
         return self.duration_hours
 
+    @property
+    def image_url(self):
+        if self.image:
+            return self.image.url
+        if self.category:
+            return self.category.image_url
+        return f"{settings.MEDIA_URL}{DEFAULT_SERVICE_IMAGE}"
+
     @duration.setter
     def duration(self, value):
         self.duration_hours = value
@@ -163,11 +215,24 @@ class Booking(models.Model):
     provider = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings_as_provider')
     service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name='bookings')
     booking_date = models.DateTimeField()
+    notes = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-created_at']
+
     def __str__(self):
         return f"Booking #{self.id} - {self.customer.full_name} with {self.provider.full_name}"
+
+    @property
+    def status_badge(self):
+        return {
+            self.Status.PENDING: 'warning',
+            self.Status.ACCEPTED: 'primary',
+            self.Status.REJECTED: 'danger',
+            self.Status.COMPLETED: 'success',
+        }.get(self.status, 'secondary')
 
 
 class Review(models.Model):

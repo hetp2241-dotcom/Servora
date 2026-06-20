@@ -23,11 +23,11 @@
 
     <div class="col-lg-4 mb-4">
         <div class="card-premium p-4 text-center">
-            {% if profile.profile_picture %}
-                <img src="{{ profile.profile_picture.url }}" alt="{{ profile.full_name }}" class="rounded-circle mb-3" style="width: 130px; height: 130px; object-fit: cover;">
+            {% if profile.profile_picture_url %}
+                <img src="{{ profile.profile_picture_url }}" alt="{{ profile.full_name }}" class="rounded-circle mb-3" style="width: 130px; height: 130px; object-fit: cover;">
             {% else %}
-                <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mb-3" style="width: 130px; height: 130px;">
-                    <i class="bi bi-person-circle fs-1 text-muted"></i>
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mb-3" style="width: 130px; height: 130px; font-size: 2rem;">
+                    {{ profile.full_name|slice:":1" }}
                 </div>
             {% endif %}
             <h4 class="mb-1">{{ profile.full_name }}</h4>

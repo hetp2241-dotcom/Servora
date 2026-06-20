@@ -2,80 +2,216 @@
 
 {% block title %}{{ service.title }} | HyperLocal{% endblock %}
 
+{% block extra_css %}
+    .detail-meta {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .detail-meta .meta-pill {
+        border-radius: 20px;
+        background: rgba(99, 102, 241, 0.08);
+        color: #4338ca;
+        padding: 0.85rem 1rem;
+        font-weight: 700;
+    }
+
+    .review-card {
+        border-radius: 24px;
+        border: 1px solid rgba(226, 232, 240, 0.95);
+        background: white;
+        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
+    }
+
+    .related-card {
+        border-radius: 24px;
+        border: 1px solid rgba(226, 232, 240, 0.95);
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .related-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    .detail-summary {
+        min-height: 260px;
+    }
+{% endblock %}
+
 {% block content %}
-<div class="row animate-fade-in">
-    <div class="col-12 mb-4">
-        <div class="card-premium p-4 d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
-            <div>
-                <span class="text-uppercase text-xs text-muted">Service Details</span>
-                <h1 class="mb-2">{{ service.title }}</h1>
-                <p class="text-muted mb-0">Category:
-                    {% if service.category %}
-                        {{ service.category.name }}
-                    {% else %}
-                        General
-                    {% endif %}
-                </p>
-            </div>
-            <div class="d-flex gap-2 flex-wrap align-items-center">
-                <a href="{% url 'service_list' %}" class="btn btn-outline-secondary rounded-pill">Back to services</a>
-                <form action="{% url 'book_service' service.pk %}" method="post" class="d-inline-block">
-                    {% csrf_token %}
-                    <input type="hidden" name="booking_date" value="{{ now|date:'Y-m-d\TH:i' }}">
-                    <button type="submit" class="btn btn-gradient-primary rounded-pill">Request Booking</button>
-                </form>
+<div class="row gx-4 gy-5 animate-fade-in">
+    <div class="col-12">
+        <div class="hero-panel p-5">
+            <div class="row align-items-center gy-4">
+                <div class="col-lg-8">
+                    <span class="text-uppercase text-muted fw-semibold small">Service detail</span>
+                    <h1 class="hero-title mt-3 mb-3">{{ service.title }}</h1>
+                    <p class="section-subtitle mb-4">Delivered by {{ service.provider.full_name }} — built for speed, quality and trust.</p>
+                    <div class="detail-meta mb-4">
+                        <div class="meta-pill">Category: {% if service.category %}{{ service.category.name }}{% else %}General{% endif %}</div>
+                        <div class="meta-pill">Duration: {{ service.duration }} hr</div>
+                        <div class="meta-pill">Price: ₹{{ service.price }}</div>
+                        <div class="meta-pill">Status: {{ service.is_available|yesno:'Available,Unavailable' }}</div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="#booking-panel" class="btn btn-primary-glow btn-pill">Request booking</a>
+                        <a href="{% url 'service_list' %}" class="btn btn-secondary-ghost btn-pill">Back to services</a>
+                        {% if provider_profile %}
+                            <a href="{% url 'provider_profile_detail' provider_profile.pk %}" class="btn btn-outline-primary btn-pill">Provider profile</a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <div class="glass-card p-4 detail-summary">
+                        {% if service.image_url %}
+                            <img src="{{ service.image_url }}" alt="{{ service.title }}" class="img-fluid rounded-4 w-100 mb-3">
+                        {% else %}
+                            <div class="bg-gradient rounded-4 d-flex align-items-center justify-content-center" style="height: 260px; background: linear-gradient(135deg, rgba(109,93,252,0.18), rgba(20,184,166,0.12));">
+                                <div class="text-center px-4">
+                                    <p class="fw-bold text-secondary">Premium service image coming soon</p>
+                                </div>
+                            </div>
+                        {% endif %}
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="mb-1 text-muted small">Rating</p>
+                                <h3 class="mb-0">{{ average_rating|floatformat:1 }} / 5</h3>
+                            </div>
+                            <div class="text-end">
+                                <p class="mb-1 text-muted small">Reviews</p>
+                                <h3 class="mb-0">{{ total_reviews }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="col-lg-8 mb-4">
+    <div class="col-lg-8">
+        <div class="card-premium p-4 mb-4">
+            <h3 class="section-heading mb-3">About this service</h3>
+            <p class="text-muted mb-0">{{ service.description }}</p>
+        </div>
+
+        <div class="card-premium p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="section-heading mb-0">Customer reviews</h3>
+                <span class="text-muted small">{{ total_reviews }} review{{ total_reviews|pluralize }}</span>
+            </div>
+            {% if reviews %}
+                <div class="row g-3">
+                    {% for review in reviews %}
+                        <div class="col-12 review-card p-4">
+                            <div class="d-flex justify-content-between align-items-start mb-3 gap-3 flex-wrap">
+                                <div>
+                                    <h5 class="mb-1">{{ review.customer.full_name }}</h5>
+                                    <div class="text-warning small">
+                                        {% for i in "12345"|make_list %}
+                                            {% if forloop.counter <= review.rating %}
+                                                <i class="bi bi-star-fill"></i>
+                                            {% else %}
+                                                <i class="bi bi-star"></i>
+                                            {% endif %}
+                                        {% endfor %}
+                                        <span class="ms-2 text-muted">{{ review.rating }} / 5</span>
+                                    </div>
+                                </div>
+                                <span class="text-muted small">{{ review.created_at|date:'M d, Y' }}</span>
+                            </div>
+                            <p class="mb-0 text-muted">{{ review.comment }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">No customer reviews are available for this service yet.</p>
+            {% endif %}
+        </div>
+
         <div class="card-premium p-4">
-            <div class="row g-4">
-                <div class="col-md-5">
-                    {% if service.image %}
-                        <img src="{{ service.image.url }}" alt="{{ service.title }}" class="img-fluid rounded-4">
-                    {% else %}
-                        <div class="bg-light rounded-4 d-flex align-items-center justify-content-center" style="height: 320px;">
-                            <i class="bi bi-briefcase-fill fs-1 text-muted"></i>
+            <h3 class="section-heading mb-3">More from {{ service.provider.first_name }}</h3>
+            <div class="row g-3">
+                {% if related_services %}
+                    {% for related in related_services %}
+                        <div class="col-12">
+                            <a href="{% url 'service_detail' related.pk %}" class="related-card d-flex gap-3 p-3 text-decoration-none text-body align-items-center">
+                                {% if related.image_url %}
+                                    <img src="{{ related.image_url }}" alt="{{ related.title }}" class="rounded-4" style="width: 96px; height: 96px; object-fit: cover;">
+                                {% else %}
+                                    <div class="bg-gradient rounded-4 d-flex align-items-center justify-content-center" style="width: 96px; height: 96px; background: linear-gradient(135deg, rgba(109,93,252,0.18), rgba(20,184,166,0.12));">
+                                        <span class="text-secondary small">Image pending</span>
+                                    </div>
+                                {% endif %}
+                                <div>
+                                    <h5 class="mb-1">{{ related.title }}</h5>
+                                    <p class="text-muted small mb-1">Starts at ₹{{ related.price }}</p>
+                                    <span class="badge bg-primary bg-opacity-15 text-primary rounded-pill py-2 px-3">{{ related.duration }} hr</span>
+                                </div>
+                            </a>
                         </div>
-                    {% endif %}
-                </div>
-                <div class="col-md-7 d-flex flex-column justify-content-between">
-                    <div>
-                        <div class="d-flex flex-wrap gap-2 mb-3">
-                            <span class="badge bg-secondary bg-opacity-15 text-secondary rounded-pill py-2 px-3">${{ service.price }}</span>
-                            <span class="badge bg-secondary bg-opacity-15 text-secondary rounded-pill py-2 px-3">{{ service.duration }} hr</span>
-                            <span class="badge bg-secondary bg-opacity-15 text-secondary rounded-pill py-2 px-3">{{ service.provider.full_name }}</span>
-                        </div>
-                        <p class="text-muted">{{ service.description }}</p>
+                    {% endfor %}
+                {% else %}
+                    <div class="col-12">
+                        <p class="text-muted mb-0">No related services are available right now.</p>
                     </div>
-                    <div class="mt-3">
-                        <a href="{% url 'provider_profile_detail' service.provider.provider_profile.pk %}" class="btn btn-outline-primary rounded-pill">View Provider Profile</a>
-                    </div>
-                </div>
+                {% endif %}
             </div>
         </div>
     </div>
 
     <div class="col-lg-4">
-        <div class="card-premium p-4">
-            <h4 class="mb-3">Provider Information</h4>
+        <div class="card-premium p-4 sticky-aside">
             <div class="d-flex align-items-center gap-3 mb-4">
-                <div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 58px; height: 58px;">
-                    <i class="bi bi-person-fill fs-4"></i>
-                </div>
+                {% if provider_profile and provider_profile.profile_picture_url %}
+                    <img src="{{ provider_profile.profile_picture_url }}" alt="{{ service.provider.full_name }}" class="rounded-circle" style="width: 72px; height: 72px; object-fit: cover;" />
+                {% else %}
+                    <div class="avatar-badge bg-primary text-white d-flex align-items-center justify-content-center rounded-circle" style="width: 72px; height: 72px; font-size: 1.1rem;">
+                        {{ service.provider.full_name|slice:":1" }}
+                    </div>
+                {% endif %}
                 <div>
                     <h5 class="mb-1">{{ service.provider.full_name }}</h5>
-                    <p class="text-muted small mb-0">{{ service.provider.email }}</p>
+                    <p class="text-muted small mb-0">{% if provider_profile %}{{ provider_profile.city }}{% else %}Location unavailable{% endif %}</p>
                 </div>
             </div>
-            {% if provider_profile %}
-                <p class="text-muted mb-2"><strong>Location:</strong> {{ provider_profile.city }}{% if provider_profile.city and provider_profile.address %}, {% endif %}{{ provider_profile.address }}</p>
-                <p class="text-muted mb-2"><strong>Experience:</strong> {{ provider_profile.experience_years }} years</p>
-                <p class="text-muted mb-0">{{ provider_profile.description|truncatewords:25 }}</p>
-            {% else %}
-                <p class="text-muted">Provider profile details are not available yet.</p>
+            <div class="mb-3">
+                <span class="text-muted small">Experience</span>
+                <p class="mb-1">{{ provider_profile.experience_years|default:'0' }} years</p>
+            </div>
+            {% if provider_profile and provider_profile.is_verified %}
+                <div class="verified-badge mb-3"><i class="bi bi-patch-check-fill"></i> Provider verified</div>
             {% endif %}
+            <div class="mb-3">
+                <span class="text-muted small">Service created</span>
+                <p class="mb-0">{{ service.created_at|date:'M d, Y' }}</p>
+            </div>
+            <hr>
+            <div id="booking-panel">
+                <h5 class="mb-3">Book this service</h5>
+                {% if user.is_authenticated and user.role == 'CUSTOMER' %}
+                    <form action="{% url 'book_service' service.pk %}" method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="booking_date" class="form-label">Preferred date & time</label>
+                            {{ booking_form.booking_date }}
+                        </div>
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Booking notes</label>
+                            {{ booking_form.notes }}
+                        </div>
+                        <button type="submit" class="btn btn-gradient-primary w-100 rounded-pill">Submit booking request</button>
+                    </form>
+                {% elif not user.is_authenticated %}
+                    <p class="text-muted">Please <a href="{% url 'login' %}?next={% url 'service_detail' service.pk %}">login</a> as a customer to book.</p>
+                {% else %}
+                    <p class="text-muted">Only customers may request bookings. Switch to a customer account to continue.</p>
+                {% endif %}
+            </div>
+            <div class="alert alert-info py-3 mb-0" role="alert">
+                <strong>Payment placeholder:</strong> Razorpay integration will be added later after booking confirmation.
+            </div>
         </div>
     </div>
 </div>

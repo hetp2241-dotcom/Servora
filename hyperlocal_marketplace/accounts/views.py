@@ -4,7 +4,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Avg, Q
+from django.db.models import Avg, Count, Q
 from django.utils import timezone
 from django.views.generic import ListView, DetailView
 from .forms import (
@@ -93,7 +93,10 @@ class ServiceListView(ListView):
     paginate_by = 12
 
     def get_queryset(self):
-        queryset = Service.objects.select_related('provider', 'category', 'provider__provider_profile')
+        queryset = Service.objects.select_related('provider', 'category', 'provider__provider_profile').annotate(
+            avg_rating=Avg('bookings__review__rating'),
+            review_count=Count('bookings__review')
+        )
         search = self.request.GET.get('search', '').strip()
         category_name = self.request.GET.get('category', '').strip()
         city = self.request.GET.get('city', '').strip()
@@ -221,6 +224,11 @@ class ServiceDetailView(DetailView):
         context['booking_form'] = BookingForm()
         context['provider_profile'] = getattr(self.object.provider, 'provider_profile', None)
         context['now'] = timezone.now()
+        reviews = Review.objects.filter(booking__service=self.object).select_related('customer').order_by('-created_at')
+        context['reviews'] = reviews
+        context['average_rating'] = reviews.aggregate(avg=Avg('rating'))['avg'] or 0
+        context['total_reviews'] = reviews.count()
+        context['related_services'] = self.object.provider.services.filter(is_available=True).exclude(pk=self.object.pk)[:4]
         return context
 
 
@@ -267,9 +275,14 @@ def provider_profile_edit(request):
 @role_required('CUSTOMER')
 def customer_dashboard(request):
     services = Service.objects.filter(is_available=True).select_related('provider', 'category')[:8]
-    bookings = Booking.objects.filter(customer=request.user).select_related('service', 'provider').order_by('-created_at')
+    status_filter = request.GET.get('status', 'all').upper()
+    bookings = Booking.objects.filter(customer=request.user).select_related('service', 'provider')
+    if status_filter in Booking.Status.values:
+        bookings = bookings.filter(status=status_filter)
+    bookings = bookings.order_by('-created_at')
     providers = User.objects.filter(role=User.Role.PROVIDER)
     review_form = ReviewForm()
+    selected_status = status_filter if status_filter in Booking.Status.values else 'all'
 
     chat_partner_id = request.GET.get('chat_with')
     chat_partner = None
@@ -289,6 +302,7 @@ def customer_dashboard(request):
         'chat_partner': chat_partner,
         'chat_messages': chat_messages,
         'review_form': review_form,
+        'selected_status': selected_status,
     }
     return render(request, 'accounts/customer_dashboard.html', context)
 
@@ -298,9 +312,14 @@ def customer_dashboard(request):
 def provider_dashboard(request):
     profile = get_object_or_404(ProviderProfile, user=request.user)
     services = Service.objects.filter(provider=request.user).select_related('category').order_by('-created_at')
-    bookings = Booking.objects.filter(provider=request.user).select_related('service', 'customer').order_by('-created_at')
+    status_filter = request.GET.get('status', 'all').upper()
+    bookings = Booking.objects.filter(provider=request.user).select_related('service', 'customer')
+    if status_filter in Booking.Status.values:
+        bookings = bookings.filter(status=status_filter)
+    bookings = bookings.order_by('-created_at')
     service_form = ServiceForm()
     categories = Category.objects.all()
+    selected_status = status_filter if status_filter in Booking.Status.values else 'all'
 
     total_services = services.count()
     active_services = services.filter(is_available=True).count()
@@ -336,6 +355,7 @@ def provider_dashboard(request):
         'customers': customers,
         'chat_partner': chat_partner,
         'chat_messages': chat_messages,
+        'selected_status': selected_status,
     }
     return render(request, 'accounts/provider_dashboard.html', context)
 
@@ -345,7 +365,18 @@ def provider_dashboard(request):
 def admin_dashboard(request):
     users = User.objects.all().order_by('-date_joined')
     providers = User.objects.filter(role=User.Role.PROVIDER)
-    bookings = Booking.objects.all().select_related('customer', 'provider', 'service').order_by('-created_at')
+    status_filter = request.GET.get('status', 'all').upper()
+    search_query = request.GET.get('search', '').strip()
+    bookings = Booking.objects.all().select_related('customer', 'provider', 'service')
+    if status_filter in Booking.Status.values:
+        bookings = bookings.filter(status=status_filter)
+    if search_query:
+        bookings = bookings.filter(
+            Q(customer__full_name__icontains=search_query) |
+            Q(provider__full_name__icontains=search_query) |
+            Q(service__name__icontains=search_query)
+        )
+    bookings = bookings.order_by('-created_at')
     reviews = Review.objects.all().select_related('customer', 'provider', 'booking').order_by('-created_at')
 
     commission_rate = request.session.get('commission_rate', 15.0)
@@ -377,6 +408,8 @@ def admin_dashboard(request):
         'bookings': bookings,
         'reviews': reviews,
         'commission_rate': commission_rate,
+        'search_query': search_query,
+        'selected_status': status_filter if status_filter in Booking.Status.values else 'all',
         'analytics': {
             'total_users': total_users,
             'total_providers': total_providers,
@@ -438,6 +471,10 @@ def book_service(request, service_id):
 
     if request.method == 'POST':
         form = BookingForm(request.POST)
+        if service.provider == request.user:
+            messages.error(request, 'You cannot book your own service.')
+            return redirect('service_detail', pk=service_id)
+
         if form.is_valid():
             booking = form.save(commit=False)
             booking.customer = request.user
@@ -445,9 +482,17 @@ def book_service(request, service_id):
             booking.provider = service.provider
             booking.status = Booking.Status.PENDING
             booking.save()
-            messages.success(request, f"Booking request for '{service.title}' sent successfully!")
-        else:
-            messages.error(request, 'Failed to submit booking. Select a valid date and time.')
+            messages.success(request, f"Booking request for '{service.title}' submitted successfully!")
+
+            # Placeholder for future payment integration:
+            # - Create Razorpay order here after booking save
+            # - Attach payment metadata to booking
+            # - Redirect to a payment page or trigger Razorpay Checkout
+            return redirect('service_detail', pk=service_id)
+
+        messages.error(request, 'Failed to submit booking. Select a valid future date and time.')
+    else:
+        messages.error(request, 'Booking requests must be submitted via the service detail page.')
 
     return redirect('service_detail', pk=service_id)
 

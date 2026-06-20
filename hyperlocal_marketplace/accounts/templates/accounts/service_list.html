@@ -9,11 +9,6 @@
         background: #ffffff;
     }
 
-    .filter-panel-toggle {
-        border-radius: 18px;
-        padding: 0.9rem 1.2rem;
-    }
-
     .active-filter-badge {
         background: rgba(124, 58, 237, 0.08);
         color: #4f46e5;
@@ -30,13 +25,13 @@
         color: #4f46e5;
     }
 
-    .service-list-header {
-        gap: 1rem;
-    }
-
     .service-count {
         font-size: 0.95rem;
         color: #475569;
+    }
+
+    .service-card .card-img-top {
+        min-height: 240px;
     }
 
     @media (max-width: 991px) {
@@ -53,68 +48,57 @@
 {% endblock %}
 
 {% block content %}
-<div class="row animate-fade-in">
-    <div class="col-12 mb-4">
-        <div class="hero-card p-5">
+<div class="row gx-4 gy-5 animate-fade-in">
+    <div class="col-12">
+        <div class="hero-panel p-5">
             <div class="row align-items-center gy-4">
                 <div class="col-lg-7">
-                    <span class="text-uppercase text-xs text-muted">Advanced Marketplace Search</span>
-                    <h1 class="mt-2 mb-3">Find the right service provider for every home task.</h1>
-                    <p class="text-muted lead">Search by service, provider, category, or city. Filter by price, experience, verification, and availability.</p>
+                    <span class="text-uppercase text-muted fw-semibold small">Find trusted local experts</span>
+                    <h1 class="hero-title mt-3 mb-3">Premium home services booked in minutes.</h1>
+                    <p class="section-subtitle mb-4">Browse verified providers offering plumbing, electrical, cleaning, painting and more. Smart filters help you compare price, rating and availability instantly.</p>
+                    <form class="row g-2" method="get" action="{% url 'service_list' %}">
+                        <div class="col-12 col-md-7">
+                            <div class="input-group input-group-lg nav-search">
+                                <span class="input-group-text bg-white border-0"><i class="bi bi-search"></i></span>
+                                {{ filter_form.search }}
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-5 d-grid gap-2">
+                            <button type="submit" class="btn btn-primary-glow btn-pill">Search services</button>
+                        </div>
+                    </form>
                 </div>
-                <div class="col-lg-5 text-lg-end">
-                    <a href="#filters" class="btn btn-gradient-secondary filter-panel-toggle mobile-filters" data-bs-toggle="offcanvas" data-bs-target="#mobileFilters" aria-controls="mobileFilters">
-                        <i class="bi bi-funnel-fill me-2"></i>Open Filters
-                    </a>
+                <div class="col-lg-5">
+                    <div class="glass-card p-4 h-100">
+                        <h5 class="section-card-title mb-3">Popular categories</h5>
+                        <div class="row g-3">
+                            <div class="col-6"><a class="category-pill" href="?category=Plumber"><span class="category-icon"><i class="bi bi-droplet-half"></i></span>Plumbing</a></div>
+                            <div class="col-6"><a class="category-pill" href="?category=Electrician"><span class="category-icon"><i class="bi bi-lightning-charge-fill"></i></span>Electrical</a></div>
+                            <div class="col-6"><a class="category-pill" href="?category=Cleaner"><span class="category-icon"><i class="bi bi-bucket-fill"></i></span>Cleaning</a></div>
+                            <div class="col-6"><a class="category-pill" href="?category=Painter"><span class="category-icon"><i class="bi bi-brush-fill"></i></span>Painting</a></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-12 mb-3">
-        <div class="card-premium p-4 d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center service-list-header">
+    <div class="col-12">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
             <div>
-                <small class="text-uppercase text-muted">Search</small>
-                <h2 class="mt-1 mb-2">Browse services</h2>
+                <h2 class="section-heading mb-1">Available services</h2>
                 <p class="service-count mb-0">Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} services</p>
             </div>
-            <form class="row gy-2 gx-2 align-items-center mb-0" method="get">
-                <div class="col-12 col-md-7">
-                    {{ filter_form.search }}
-                </div>
-                <div class="col-12 col-md-4">
-                    {{ filter_form.sort_by }}
-                </div>
-                <div class="col-12 col-md-auto">
-                    <button type="submit" class="btn btn-gradient-primary w-100 rounded-pill">Search</button>
-                </div>
-                {% if request.GET.category %}
-                    <input type="hidden" name="category" value="{{ request.GET.category }}">
-                {% endif %}
-                {% if request.GET.city %}
-                    <input type="hidden" name="city" value="{{ request.GET.city }}">
-                {% endif %}
-                {% if request.GET.min_price %}
-                    <input type="hidden" name="min_price" value="{{ request.GET.min_price }}">
-                {% endif %}
-                {% if request.GET.max_price %}
-                    <input type="hidden" name="max_price" value="{{ request.GET.max_price }}">
-                {% endif %}
-                {% if request.GET.experience %}
-                    <input type="hidden" name="experience" value="{{ request.GET.experience }}">
-                {% endif %}
-                {% if request.GET.verified_only %}
-                    <input type="hidden" name="verified_only" value="{{ request.GET.verified_only }}">
-                {% endif %}
-                {% if request.GET.available_only %}
-                    <input type="hidden" name="available_only" value="{{ request.GET.available_only }}">
-                {% endif %}
-            </form>
+            <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-secondary-ghost btn-pill d-md-none mobile-filters" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileFilters" aria-controls="mobileFilters">
+                    <i class="bi bi-funnel-fill me-2"></i>Filters
+                </button>
+            </div>
         </div>
     </div>
 
-    <div class="col-12 mb-3">
-        {% if active_filters %}
+    {% if active_filters %}
+        <div class="col-12">
             <div class="card-premium p-3 d-flex flex-wrap align-items-center gap-2">
                 <strong class="text-muted">Active filters:</strong>
                 {% for filter in active_filters %}
@@ -125,12 +109,12 @@
                 {% endfor %}
                 <a href="{% url 'service_list' %}" class="btn btn-sm btn-outline-secondary rounded-pill ms-auto">Clear all</a>
             </div>
-        {% endif %}
-    </div>
+        </div>
+    {% endif %}
 
-    <div class="col-lg-3 desktop-filters mb-4">
-        <div class="filter-card p-4">
-            <h5 class="mb-4">Filter results</h5>
+    <div class="col-lg-4 desktop-filters">
+        <div class="filter-card p-4 sticky-aside">
+            <h5 class="mb-4">Refine search</h5>
             <form method="get" action="">
                 <div class="mb-3">
                     <label class="form-label">Category</label>
@@ -160,7 +144,7 @@
                 </div>
                 <div class="form-check mb-4">
                     {{ filter_form.available_only }}
-                    <label class="form-check-label" for="id_available_only">Available services only</label>
+                    <label class="form-check-label" for="id_available_only">Available only</label>
                 </div>
                 <div class="d-grid gap-2">
                     <button type="submit" class="btn btn-gradient-primary rounded-pill">Apply filters</button>
@@ -170,33 +154,53 @@
         </div>
     </div>
 
-    <div class="col-lg-9">
+    <div class="col-lg-8">
         <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
             {% if services %}
                 {% for service in services %}
                     <div class="col">
                         <div class="service-card h-100 d-flex flex-column">
-                            {% if service.image %}
-                                <img src="{{ service.image.url }}" class="card-img-top" alt="{{ service.title }}" style="height: 260px; object-fit: cover;">
+                            {% if service.image_url %}
+                                <img src="{{ service.image_url }}" class="card-img-top" alt="{{ service.title }}">
                             {% else %}
-                                <div class="bg-light d-flex align-items-center justify-content-center" style="height: 260px;">
-                                    <i class="bi bi-briefcase-fill fs-1 text-muted"></i>
+                                <div class="bg-gradient d-flex align-items-center justify-content-center" style="height: 240px; background: linear-gradient(135deg, rgba(109,93,252,0.18), rgba(20,184,166,0.12));">
+                                    <div class="text-center">
+                                        <p class="fw-bold text-secondary">Service image coming soon</p>
+                                    </div>
                                 </div>
                             {% endif %}
                             <div class="card-body d-flex flex-column">
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="badge bg-secondary bg-opacity-15 text-secondary rounded-pill py-2 px-3">{% if service.category %}{{ service.category.name }}{% else %}General{% endif %}</span>
-                                    <span class="rating-pill">{{ service.duration }} hr</span>
+                                <div class="d-flex align-items-center gap-2 mb-3">
+                                    <div class="rounded-circle overflow-hidden border" style="width: 40px; height: 40px;">
+                                        {% if service.provider.provider_profile and service.provider.provider_profile.profile_picture_url %}
+                                            <img src="{{ service.provider.provider_profile.profile_picture_url }}" alt="{{ service.provider.full_name }}" class="w-100 h-100" style="object-fit: cover;">
+                                        {% else %}
+                                            <div class="bg-secondary text-white d-flex align-items-center justify-content-center w-100 h-100">{{ service.provider.full_name|slice:":1" }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <p class="text-muted small mb-0">{{ service.provider.full_name }}</p>
+                                        {% if service.provider.provider_profile and service.provider.provider_profile.is_verified %}
+                                            <span class="badge bg-success bg-opacity-15 text-success rounded-pill py-1 px-2 small">Verified</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-3 flex-wrap">
+                                    <span class="badge bg-primary bg-opacity-15 text-primary rounded-pill py-2 px-3">{% if service.category %}{{ service.category.name }}{% else %}General{% endif %}</span>
+                                    <span class="rating-pill"><i class="bi bi-star-fill"></i> {{ service.avg_rating|default:0|floatformat:1 }} ({{ service.review_count|default:0 }})</span>
                                 </div>
                                 <h4 class="mb-2">{{ service.title }}</h4>
-                                <p class="text-muted small mb-2">By <strong>{{ service.provider.full_name }}</strong></p>
-                                <p class="text-muted small flex-grow-1">{{ service.description|truncatewords:22 }}</p>
-                                <div class="mt-4 d-flex justify-content-between align-items-center gap-3">
+                                <p class="text-muted small mb-3">By <strong>{{ service.provider.full_name }}</strong></p>
+                                <p class="text-muted small flex-grow-1">{{ service.description|truncatewords:18 }}</p>
+                                <div class="mt-4 d-flex justify-content-between align-items-center gap-2 flex-wrap">
                                     <div>
-                                        <span class="text-muted small">Starts at</span>
+                                        <p class="mb-1 text-muted small">Starting from</p>
                                         <p class="mb-0 fs-5 fw-semibold">₹{{ service.price }}</p>
                                     </div>
-                                    <a href="{% url 'service_detail' service.pk %}" class="btn btn-gradient-primary btn-sm rounded-pill">View</a>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <a href="{% url 'service_detail' service.pk %}" class="btn btn-outline-secondary btn-sm rounded-pill">View</a>
+                                        <a href="{% url 'service_detail' service.pk %}#booking-panel" class="btn btn-gradient-primary btn-sm rounded-pill">Book</a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -206,9 +210,9 @@
                 <div class="col-12">
                     <div class="card-premium p-5 text-center">
                         <i class="bi bi-search fs-1 text-muted"></i>
-                        <h4 class="mt-3">No services match your filters</h4>
-                        <p class="text-muted mb-4">Adjust your search or clear filters to discover more service providers.</p>
-                        <a href="{% url 'service_list' %}" class="btn btn-gradient-primary rounded-pill">Clear filters</a>
+                        <h4 class="mt-3">No matching services</h4>
+                        <p class="text-muted mb-4">Try broadening your search or removing some filters to discover more options.</p>
+                        <a href="{% url 'service_list' %}" class="btn btn-gradient-primary rounded-pill">Reset filters</a>
                     </div>
                 </div>
             {% endif %}
@@ -219,17 +223,13 @@
                 <nav aria-label="Service pagination">
                     <ul class="pagination justify-content-center">
                         {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">Previous</a>
-                            </li>
+                            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">Previous</a></li>
                         {% else %}
                             <li class="page-item disabled"><span class="page-link">Previous</span></li>
                         {% endif %}
                         <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
                         {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">Next</a>
-                            </li>
+                            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">Next</a></li>
                         {% else %}
                             <li class="page-item disabled"><span class="page-link">Next</span></li>
                         {% endif %}
@@ -283,7 +283,7 @@
             </div>
             <div class="form-check mb-3">
                 {{ filter_form.available_only }}
-                <label class="form-check-label" for="id_available_only">Available services only</label>
+                <label class="form-check-label" for="id_available_only">Available only</label>
             </div>
             <div class="d-grid gap-2">
                 <button type="submit" class="btn btn-gradient-primary rounded-pill">Apply filters</button>
