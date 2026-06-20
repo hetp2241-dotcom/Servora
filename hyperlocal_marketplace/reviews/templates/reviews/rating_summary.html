@@ -1,0 +1,61 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Rating Summary | HyperLocal{% endblock %}
+
+{% block content %}
+<div class="row g-4 animate-fade-in">
+    <div class="col-lg-4">
+        <div class="card-premium p-4 text-center h-100">
+            <span class="text-uppercase text-muted small fw-semibold">Provider rating</span>
+            <h1 class="display-4 mt-3 mb-0">{{ stats.average_rating }}</h1>
+            <div class="text-warning fs-4 my-2">
+                {% for i in "12345"|make_list %}
+                    <i class="bi bi-star-fill"></i>
+                {% endfor %}
+            </div>
+            <p class="text-muted mb-0">{{ stats.review_count }} verified review{{ stats.review_count|pluralize }}</p>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card-premium p-4 h-100">
+            <h2 class="h4 mb-3">Rating Distribution</h2>
+            <canvas id="ratingDistributionChart" height="120"></canvas>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="row g-4">
+            {% for review in stats.latest_reviews %}
+                <div class="col-md-6">{% include 'reviews/review_card.html' with review=review %}</div>
+            {% empty %}
+                <div class="col-12"><div class="card-premium p-4 text-muted">No reviews yet.</div></div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ratingData = [
+        {% for count in distribution_counts %}{{ count }}{% if not forloop.last %}, {% endif %}{% endfor %}
+    ];
+    new Chart(document.getElementById('ratingDistributionChart'), {
+        type: 'bar',
+        data: {
+            labels: ['1 star', '2 stars', '3 stars', '4 stars', '5 stars'],
+            datasets: [{
+                label: 'Reviews',
+                data: ratingData,
+                backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#22c55e'],
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+            plugins: { legend: { display: false } }
+        }
+    });
+</script>
+{% endblock %}

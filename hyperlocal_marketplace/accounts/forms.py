@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AuthenticationForm
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from .models import Category, ProviderProfile, Service, Booking, Review
+from .models import Category, ProviderProfile, Service, Booking
 
 User = get_user_model()
 
@@ -137,16 +137,6 @@ class BookingForm(forms.ModelForm):
         if booking_date and booking_date <= timezone.now():
             raise forms.ValidationError('Please select a future date and time for the booking.')
         return booking_date
-
-
-class ReviewForm(forms.ModelForm):
-    class Meta:
-        model = Review
-        fields = ['rating', 'comment']
-        widgets = {
-            'rating': forms.Select(attrs={'class': 'form-select'}),
-            'comment': forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Write your review here...', 'rows': 3}),
-        }
 
 
 class ServiceFilterForm(forms.Form):

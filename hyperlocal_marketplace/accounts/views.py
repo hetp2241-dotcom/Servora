@@ -1,11 +1,18 @@
 from decimal import Decimal, InvalidOperation
+import logging
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Avg, Count, Q
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
+from django.db import transaction
+from django.db.models import Avg, Count, Exists, OuterRef, Q, Sum
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.views.generic import ListView, DetailView
 from .forms import (
     CustomUserCreationForm,
@@ -13,7 +20,6 @@ from .forms import (
     ProviderProfileForm,
     ServiceForm,
     BookingForm,
-    ReviewForm,
     ServiceFilterForm,
 )
 from .models import (
@@ -22,10 +28,42 @@ from .models import (
     ProviderProfile,
     Service,
     Booking,
-    Review,
+    Payment,
     ChatMessage,
 )
 from .decorators import role_required
+from .stripe_config import create_checkout_session, get_stripe_module
+from hyperlocal_marketplace.reviews.models import Review
+from hyperlocal_marketplace.reviews.services import (
+    dashboard_statistics as review_dashboard_statistics,
+    provider_statistics,
+    service_rating_queryset,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def _mark_payment_paid(payment, stripe_payment_id=''):
+    with transaction.atomic():
+        payment = Payment.objects.select_for_update().select_related('booking').get(pk=payment.pk)
+        booking = payment.booking
+        payment.payment_status = Payment.Status.PAID
+        if stripe_payment_id and not payment.stripe_payment_id:
+            payment.stripe_payment_id = stripe_payment_id
+        payment.save(update_fields=['payment_status', 'stripe_payment_id'])
+        booking.status = Booking.Status.CONFIRMED
+        booking.save(update_fields=['status'])
+    logger.info('Payment marked paid for booking_id=%s payment_id=%s', booking.id, payment.id)
+    return payment
+
+
+def _mark_payment_failed(payment):
+    with transaction.atomic():
+        payment = Payment.objects.select_for_update().get(pk=payment.pk)
+        payment.payment_status = Payment.Status.FAILED
+        payment.save(update_fields=['payment_status'])
+    logger.warning('Payment marked failed for booking_id=%s payment_id=%s', payment.booking_id, payment.id)
+    return payment
 
 
 def register_view(request):
@@ -93,9 +131,8 @@ class ServiceListView(ListView):
     paginate_by = 12
 
     def get_queryset(self):
-        queryset = Service.objects.select_related('provider', 'category', 'provider__provider_profile').annotate(
-            avg_rating=Avg('bookings__review__rating'),
-            review_count=Count('bookings__review')
+        queryset = service_rating_queryset(
+            Service.objects.select_related('provider', 'category', 'provider__provider_profile')
         )
         search = self.request.GET.get('search', '').strip()
         category_name = self.request.GET.get('category', '').strip()
@@ -224,10 +261,12 @@ class ServiceDetailView(DetailView):
         context['booking_form'] = BookingForm()
         context['provider_profile'] = getattr(self.object.provider, 'provider_profile', None)
         context['now'] = timezone.now()
-        reviews = Review.objects.filter(booking__service=self.object).select_related('customer').order_by('-created_at')
+        reviews = Review.objects.filter(booking__service=self.object).select_related('customer', 'provider').order_by('-created_at')
         context['reviews'] = reviews
         context['average_rating'] = reviews.aggregate(avg=Avg('rating'))['avg'] or 0
         context['total_reviews'] = reviews.count()
+        if self.object.provider_id:
+            context['provider_rating_stats'] = provider_statistics(self.object.provider)
         context['related_services'] = self.object.provider.services.filter(is_available=True).exclude(pk=self.object.pk)[:4]
         return context
 
@@ -250,6 +289,7 @@ class ProviderProfileDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['services'] = self.object.user.services.filter(is_available=True).select_related('category')
+        context['rating_stats'] = provider_statistics(self.object.user)
         return context
 
 
@@ -276,12 +316,19 @@ def provider_profile_edit(request):
 def customer_dashboard(request):
     services = Service.objects.filter(is_available=True).select_related('provider', 'category')[:8]
     status_filter = request.GET.get('status', 'all').upper()
-    bookings = Booking.objects.filter(customer=request.user).select_related('service', 'provider')
+    bookings = Booking.objects.filter(customer=request.user).select_related('service', 'provider').prefetch_related('payments').annotate(
+        has_review=Exists(Review.objects.filter(booking_id=OuterRef('pk')))
+    )
     if status_filter in Booking.Status.values:
         bookings = bookings.filter(status=status_filter)
     bookings = bookings.order_by('-created_at')
+    payment_history = Payment.objects.filter(booking__customer=request.user).select_related(
+        'booking',
+        'booking__service',
+        'booking__provider',
+    ).order_by('-created_at')
     providers = User.objects.filter(role=User.Role.PROVIDER)
-    review_form = ReviewForm()
+    my_reviews = Review.objects.filter(customer=request.user).select_related('booking', 'booking__service', 'provider').order_by('-created_at')
     selected_status = status_filter if status_filter in Booking.Status.values else 'all'
 
     chat_partner_id = request.GET.get('chat_with')
@@ -301,8 +348,9 @@ def customer_dashboard(request):
         'providers': providers,
         'chat_partner': chat_partner,
         'chat_messages': chat_messages,
-        'review_form': review_form,
         'selected_status': selected_status,
+        'payment_history': payment_history,
+        'my_reviews': my_reviews,
     }
     return render(request, 'accounts/customer_dashboard.html', context)
 
@@ -325,6 +373,7 @@ def provider_dashboard(request):
     active_services = services.filter(is_available=True).count()
     recent_services = services[:4]
     profile_completion = profile.completion_percentage
+    review_stats = provider_statistics(request.user)
 
     customer_ids = bookings.values_list('customer_id', flat=True).distinct()
     customers = User.objects.filter(role=User.Role.CUSTOMER, id__in=customer_ids)
@@ -356,6 +405,7 @@ def provider_dashboard(request):
         'chat_partner': chat_partner,
         'chat_messages': chat_messages,
         'selected_status': selected_status,
+        'review_stats': review_stats,
     }
     return render(request, 'accounts/provider_dashboard.html', context)
 
@@ -377,7 +427,9 @@ def admin_dashboard(request):
             Q(service__name__icontains=search_query)
         )
     bookings = bookings.order_by('-created_at')
-    reviews = Review.objects.all().select_related('customer', 'provider', 'booking').order_by('-created_at')
+    reviews = Review.objects.all().select_related('customer', 'provider', 'booking', 'booking__service').order_by('-created_at')
+    review_stats = review_dashboard_statistics()
+    payments = Payment.objects.select_related('booking', 'booking__customer', 'booking__service').order_by('-created_at')
 
     commission_rate = request.session.get('commission_rate', 15.0)
     if request.method == 'POST' and 'update_settings' in request.POST:
@@ -399,7 +451,10 @@ def admin_dashboard(request):
     pending_bookings = bookings.filter(status=Booking.Status.PENDING).count()
     accepted_bookings = bookings.filter(status=Booking.Status.ACCEPTED).count()
     avg_rating = reviews.aggregate(Avg('rating'))['rating__avg'] or 0.0
-    total_revenue = sum(b.service.price for b in bookings if b.status == Booking.Status.COMPLETED)
+    total_revenue = payments.filter(payment_status=Payment.Status.PAID).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    successful_payments = payments.filter(payment_status=Payment.Status.PAID).count()
+    failed_payments = payments.filter(payment_status=Payment.Status.FAILED).count()
+    recent_transactions = payments[:10]
     platform_earnings = total_revenue * (Decimal(str(commission_rate)) / Decimal('100'))
 
     context = {
@@ -407,6 +462,7 @@ def admin_dashboard(request):
         'providers': providers,
         'bookings': bookings,
         'reviews': reviews,
+        'review_stats': review_stats,
         'commission_rate': commission_rate,
         'search_query': search_query,
         'selected_status': status_filter if status_filter in Booking.Status.values else 'all',
@@ -419,9 +475,14 @@ def admin_dashboard(request):
             'pending_bookings': pending_bookings,
             'accepted_bookings': accepted_bookings,
             'avg_rating': round(avg_rating, 1),
+            'total_reviews': review_stats['total_reviews'],
+            'average_platform_rating': review_stats['average_platform_rating'],
             'total_revenue': total_revenue,
+            'successful_payments': successful_payments,
+            'failed_payments': failed_payments,
             'platform_earnings': platform_earnings,
         },
+        'recent_transactions': recent_transactions,
     }
     return render(request, 'accounts/admin_dashboard.html', context)
 
@@ -476,25 +537,165 @@ def book_service(request, service_id):
             return redirect('service_detail', pk=service_id)
 
         if form.is_valid():
-            booking = form.save(commit=False)
-            booking.customer = request.user
-            booking.service = service
-            booking.provider = service.provider
-            booking.status = Booking.Status.PENDING
-            booking.save()
-            messages.success(request, f"Booking request for '{service.title}' submitted successfully!")
+            with transaction.atomic():
+                booking = form.save(commit=False)
+                booking.customer = request.user
+                booking.service = service
+                booking.provider = service.provider
+                booking.status = Booking.Status.PENDING
+                booking.save()
+                payment = Payment.objects.create(
+                    booking=booking,
+                    amount=service.price,
+                    payment_status=Payment.Status.PENDING,
+                )
 
-            # Placeholder for future payment integration:
-            # - Create Razorpay order here after booking save
-            # - Attach payment metadata to booking
-            # - Redirect to a payment page or trigger Razorpay Checkout
-            return redirect('service_detail', pk=service_id)
+            try:
+                checkout_session = create_checkout_session(request, payment)
+            except ImproperlyConfigured as exc:
+                logger.exception('Stripe checkout configuration error for payment_id=%s', payment.id)
+                _mark_payment_failed(payment)
+                messages.error(request, str(exc))
+                return redirect('service_detail', pk=service_id)
+            except Exception:
+                logger.exception('Stripe checkout creation failed for payment_id=%s', payment.id)
+                _mark_payment_failed(payment)
+                messages.error(request, 'Unable to start secure checkout right now. Please try again.')
+                return redirect('payment_cancel', payment_id=payment.id)
+
+            payment.stripe_payment_id = checkout_session.id
+            payment.save(update_fields=['stripe_payment_id'])
+            logger.info('Stripe Checkout session created for booking_id=%s payment_id=%s', booking.id, payment.id)
+            return redirect(checkout_session.url)
 
         messages.error(request, 'Failed to submit booking. Select a valid future date and time.')
     else:
         messages.error(request, 'Booking requests must be submitted via the service detail page.')
 
     return redirect('service_detail', pk=service_id)
+
+
+@login_required
+@role_required('CUSTOMER')
+def payment_success(request):
+    session_id = request.GET.get('session_id')
+    if not session_id:
+        messages.error(request, 'Missing payment session details.')
+        return redirect('customer_dashboard')
+
+    payment = get_object_or_404(
+        Payment.objects.select_related('booking', 'booking__service', 'booking__provider'),
+        stripe_payment_id=session_id,
+        booking__customer=request.user,
+    )
+
+    try:
+        stripe = get_stripe_module()
+        session = stripe.checkout.Session.retrieve(session_id)
+    except Exception:
+        logger.exception('Unable to verify Stripe session_id=%s on success return', session_id)
+        messages.warning(request, 'Payment verification is still pending. We will update your booking shortly.')
+        return render(request, 'accounts/payment_success.html', {'payment': payment, 'booking': payment.booking})
+
+    if session.payment_status == 'paid':
+        _mark_payment_paid(payment, getattr(session, 'payment_intent', '') or session_id)
+        payment.refresh_from_db()
+        messages.success(request, 'Payment successful. Your booking is confirmed.')
+    else:
+        logger.warning('Stripe success return had non-paid status=%s for payment_id=%s', session.payment_status, payment.id)
+        messages.info(request, 'Payment is still processing. Your booking will confirm after Stripe completes it.')
+
+    return render(request, 'accounts/payment_success.html', {'payment': payment, 'booking': payment.booking})
+
+
+@login_required
+@role_required('CUSTOMER')
+def payment_cancel(request, payment_id):
+    payment = get_object_or_404(
+        Payment.objects.select_related('booking', 'booking__service'),
+        id=payment_id,
+        booking__customer=request.user,
+    )
+    messages.info(request, 'Payment was cancelled. Your booking is not confirmed yet.')
+    return render(request, 'accounts/payment_cancel.html', {'payment': payment, 'booking': payment.booking})
+
+
+@login_required
+@role_required('CUSTOMER')
+@require_POST
+def retry_payment(request, payment_id):
+    payment = get_object_or_404(
+        Payment.objects.select_related('booking', 'booking__service'),
+        id=payment_id,
+        booking__customer=request.user,
+    )
+
+    if payment.payment_status == Payment.Status.PAID:
+        messages.info(request, 'This booking has already been paid.')
+        return redirect('customer_dashboard')
+
+    payment.payment_status = Payment.Status.PENDING
+    payment.save(update_fields=['payment_status'])
+
+    try:
+        checkout_session = create_checkout_session(request, payment)
+    except Exception:
+        logger.exception('Stripe retry checkout failed for payment_id=%s', payment.id)
+        _mark_payment_failed(payment)
+        messages.error(request, 'Unable to restart checkout. Please try again.')
+        return redirect('payment_cancel', payment_id=payment.id)
+
+    payment.stripe_payment_id = checkout_session.id
+    payment.save(update_fields=['stripe_payment_id'])
+    return redirect(checkout_session.url)
+
+
+@csrf_exempt
+def stripe_webhook(request):
+    payload = request.body
+    signature = request.META.get('HTTP_STRIPE_SIGNATURE', '')
+
+    if not settings.STRIPE_WEBHOOK_SECRET:
+        logger.error('Stripe webhook secret is not configured.')
+        return HttpResponse(status=500)
+
+    try:
+        stripe = get_stripe_module()
+        event = stripe.Webhook.construct_event(payload, signature, settings.STRIPE_WEBHOOK_SECRET)
+    except ValueError:
+        logger.warning('Stripe webhook received invalid payload.')
+        return HttpResponse(status=400)
+    except Exception:
+        logger.exception('Stripe webhook signature validation failed.')
+        return HttpResponse(status=400)
+
+    event_type = event.get('type')
+    event_object = event.get('data', {}).get('object', {})
+    logger.info('Stripe webhook received: %s', event_type)
+
+    if event_type == 'checkout.session.completed':
+        payment_id = event_object.get('metadata', {}).get('payment_id')
+        if payment_id:
+            payment = Payment.objects.filter(pk=payment_id).first()
+            if payment:
+                _mark_payment_paid(payment, event_object.get('payment_intent') or event_object.get('id', ''))
+            else:
+                logger.error('Webhook payment_id=%s did not match a local payment.', payment_id)
+    elif event_type == 'payment_intent.payment_failed':
+        payment_id = event_object.get('metadata', {}).get('payment_id')
+        if payment_id:
+            payment = Payment.objects.filter(pk=payment_id).first()
+            if payment:
+                _mark_payment_failed(payment)
+    elif event_type == 'charge.refunded':
+        payment_id = event_object.get('metadata', {}).get('payment_id')
+        payment = Payment.objects.filter(pk=payment_id).first() if payment_id else None
+        if payment:
+            payment.payment_status = Payment.Status.REFUNDED
+            payment.save(update_fields=['payment_status'])
+            logger.info('Payment refunded for payment_id=%s', payment.id)
+
+    return JsonResponse({'status': 'ok'})
 
 
 @login_required
@@ -516,33 +717,6 @@ def update_booking_status(request, booking_id, status):
         messages.error(request, 'Invalid status chosen.')
 
     return redirect('dashboard_redirect')
-
-
-@login_required
-@role_required('CUSTOMER')
-def add_review(request, booking_id):
-    booking = get_object_or_404(Booking, id=booking_id, customer=request.user)
-    if booking.status not in [Booking.Status.COMPLETED, Booking.Status.ACCEPTED]:
-        messages.error(request, 'You can only write a review for an active or completed booking.')
-        return redirect('customer_dashboard')
-
-    if request.method == 'POST':
-        form = ReviewForm(request.POST)
-        if form.is_valid():
-            Review.objects.update_or_create(
-                booking=booking,
-                defaults={
-                    'customer': request.user,
-                    'provider': booking.provider,
-                    'rating': form.cleaned_data['rating'],
-                    'comment': form.cleaned_data['comment'],
-                },
-            )
-            messages.success(request, 'Review submitted successfully!')
-        else:
-            messages.error(request, 'Failed to submit review. Rating must be 1-5.')
-
-    return redirect('customer_dashboard')
 
 
 @login_required
@@ -578,7 +752,5 @@ def admin_toggle_user(request, user_id):
 @login_required
 @role_required('ADMIN')
 def admin_delete_review(request, review_id):
-    review = get_object_or_404(Review, id=review_id)
-    review.delete()
-    messages.success(request, 'Review deleted successfully.')
+    messages.error(request, 'Direct admin review deletion is disabled.')
     return redirect('admin_dashboard')

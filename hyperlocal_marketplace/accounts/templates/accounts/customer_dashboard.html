@@ -144,6 +144,16 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="payments-tab" data-bs-toggle="tab" data-bs-target="#payments" type="button" role="tab" aria-controls="payments" aria-selected="false">
+                    <i class="bi bi-credit-card-2-front-fill me-2"></i>Payments
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="reviews-tab" data-bs-toggle="tab" data-bs-target="#reviews" type="button" role="tab" aria-controls="reviews" aria-selected="false">
+                    <i class="bi bi-star-fill me-2"></i>My Reviews
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat-section" type="button" role="tab" aria-controls="chat" aria-selected="false">
                     <i class="bi bi-chat-dots-fill me-2"></i>Messages
                 </button>
@@ -180,7 +190,7 @@
                                                     <i class="bi bi-chat"></i>
                                                 </a>
                                                 <button type="button" class="btn btn-gradient-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#bookModal{{ service.id }}">
-                                                    Book Now
+                                                    Confirm Booking
                                                 </button>
                                             </div>
                                         </div>
@@ -193,13 +203,13 @@
                                 <div class="modal-dialog modal-dialog-centered">
                                     <div class="modal-content border-0 rounded-4 shadow-lg">
                                         <div class="modal-header border-0 bg-light rounded-top-4">
-                                            <h5 class="modal-title" id="bookModalLabel{{ service.id }}">Book {{ service.title }}</h5>
+                                            <h5 class="modal-title" id="bookModalLabel{{ service.id }}">Confirm {{ service.title }}</h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                         </div>
                                         <form action="{% url 'book_service' service.id %}" method="POST">
                                             {% csrf_token %}
                                             <div class="modal-body p-4">
-                                                <p class="text-muted small mb-4">Request a booking with provider <strong>{{ service.provider.full_name }}</strong>. Price: <strong>${{ service.price }}</strong></p>
+                                                <p class="text-muted small mb-4">Book with <strong>{{ service.provider.full_name }}</strong>. Total due today: <strong>Rs. {{ service.price }}</strong></p>
                                                 
                                                 <div class="mb-3">
                                                     <label for="booking_date_{{ service.id }}" class="form-label font-semibold">Select Date & Time</label>
@@ -236,6 +246,7 @@
                         <div class="btn-group" role="group" aria-label="Booking status filters">
                             <a href="?status=all" class="btn btn-sm {% if selected_status == 'all' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">All</a>
                             <a href="?status=PENDING" class="btn btn-sm {% if selected_status == 'PENDING' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">Pending</a>
+                            <a href="?status=CONFIRMED" class="btn btn-sm {% if selected_status == 'CONFIRMED' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">Confirmed</a>
                             <a href="?status=ACCEPTED" class="btn btn-sm {% if selected_status == 'ACCEPTED' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">Accepted</a>
                             <a href="?status=REJECTED" class="btn btn-sm {% if selected_status == 'REJECTED' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">Rejected</a>
                             <a href="?status=COMPLETED" class="btn btn-sm {% if selected_status == 'COMPLETED' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">Completed</a>
@@ -250,6 +261,7 @@
                                     <th>Provider</th>
                                     <th>Booking Date</th>
                                     <th>Status</th>
+                                    <th>Payment</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -264,6 +276,8 @@
                                             <td>
                                                 {% if booking.status == 'PENDING' %}
                                                     <span class="badge bg-warning text-dark"><i class="bi bi-clock-history me-1"></i>Pending</span>
+                                                {% elif booking.status == 'CONFIRMED' %}
+                                                    <span class="badge bg-success"><i class="bi bi-patch-check me-1"></i>Confirmed</span>
                                                 {% elif booking.status == 'ACCEPTED' %}
                                                     <span class="badge bg-primary"><i class="bi bi-check-circle me-1"></i>Accepted</span>
                                                 {% elif booking.status == 'REJECTED' %}
@@ -273,58 +287,158 @@
                                                 {% endif %}
                                             </td>
                                             <td>
+                                                {% with payment=booking.payments.first %}
+                                                    {% if payment %}
+                                                        <span class="badge bg-{{ payment.status_badge }}">{{ payment.get_payment_status_display }}</span>
+                                                        <div class="small text-muted">Rs. {{ payment.amount }}</div>
+                                                        {% if payment.payment_status != 'PAID' %}
+                                                            <form action="{% url 'retry_payment' payment.id %}" method="post" class="mt-1">
+                                                                {% csrf_token %}
+                                                                <button type="submit" class="btn btn-link btn-sm p-0">Retry</button>
+                                                            </form>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        <span class="badge bg-secondary">No payment</span>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </td>
+                                            <td>
                                                 <div class="d-flex gap-2">
                                                     <a href="?chat_with={{ booking.provider.id }}#chat-section" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('chat-tab').click();">
                                                         <i class="bi bi-chat-text me-1"></i>Chat
                                                     </a>
                                                     
-                                                    {% if booking.status == 'COMPLETED' or booking.status == 'ACCEPTED' %}
-                                                        <button type="button" class="btn btn-gradient-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#reviewModal{{ booking.id }}">
-                                                            <i class="bi bi-star me-1"></i>Review
-                                                        </button>
+                                                    {% if booking.status == 'COMPLETED' %}
+                                                        {% if booking.has_review %}
+                                                            <a href="{% url 'reviews:list' %}" class="btn btn-outline-primary btn-sm">
+                                                                <i class="bi bi-star-fill me-1"></i>View Review
+                                                            </a>
+                                                        {% else %}
+                                                            <a href="{% url 'reviews:create' booking.id %}" class="btn btn-gradient-secondary btn-sm">
+                                                                <i class="bi bi-star me-1"></i>Write Review
+                                                            </a>
+                                                        {% endif %}
                                                     {% endif %}
                                                 </div>
                                             </td>
                                         </tr>
-
-                                        <!-- Review Modal -->
-                                        <div class="modal fade" id="reviewModal{{ booking.id }}" tabindex="-1" aria-labelledby="reviewModalLabel{{ booking.id }}" aria-hidden="true">
-                                            <div class="modal-dialog modal-dialog-centered">
-                                                <div class="modal-content border-0 rounded-4 shadow-lg">
-                                                    <div class="modal-header border-0 bg-light rounded-top-4">
-                                                        <h5 class="modal-title" id="reviewModalLabel{{ booking.id }}">Write a Review</h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <form action="{% url 'add_review' booking.id %}" method="POST">
-                                                        {% csrf_token %}
-                                                        <div class="modal-body p-4">
-                                                            <div class="mb-3">
-                                                                <label for="rating_{{ booking.id }}" class="form-label font-semibold">Rating</label>
-                                                                <select name="rating" id="rating_{{ booking.id }}" class="form-select" required>
-                                                                    <option value="5">⭐⭐⭐⭐⭐ (5 - Excellent)</option>
-                                                                    <option value="4">⭐⭐⭐⭐ (4 - Good)</option>
-                                                                    <option value="3">⭐⭐⭐ (3 - Average)</option>
-                                                                    <option value="2">⭐⭐ (2 - Poor)</option>
-                                                                    <option value="1">⭐ (1 - Terrible)</option>
-                                                                </select>
-                                                            </div>
-                                                            <div class="mb-3">
-                                                                <label for="comment_{{ booking.id }}" class="form-label font-semibold">Comment</label>
-                                                                <textarea name="comment" id="comment_{{ booking.id }}" class="form-control" rows="4" placeholder="How was your experience?" required></textarea>
-                                                            </div>
-                                                        </div>
-                                                        <div class="modal-footer border-0">
-                                                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="submit" class="btn btn-gradient-primary rounded-pill">Submit Review</button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        </div>
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="6" class="text-center py-4 text-muted">You haven't made any bookings yet.</td>
+                                        <td colspan="7" class="text-center py-4 text-muted">You haven't made any bookings yet.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Reviews Tab -->
+            <div class="tab-pane fade" id="reviews" role="tabpanel" aria-labelledby="reviews-tab">
+                <div class="card-premium p-4">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+                        <div>
+                            <h3 class="mb-1">My Reviews</h3>
+                            <p class="text-muted small mb-0">Manage reviews from your completed bookings.</p>
+                        </div>
+                        <a href="{% url 'reviews:list' %}" class="btn btn-outline-primary rounded-pill">Open Reviews</a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Service</th>
+                                    <th>Provider</th>
+                                    <th>Rating</th>
+                                    <th>Comment</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if my_reviews %}
+                                    {% for review in my_reviews %}
+                                        <tr>
+                                            <td><strong>{{ review.booking.service.title }}</strong></td>
+                                            <td>{{ review.provider.full_name }}</td>
+                                            <td>
+                                                <span class="text-warning">
+                                                    {% for i in "12345"|make_list %}
+                                                        {% if forloop.counter <= review.rating %}<i class="bi bi-star-fill"></i>{% else %}<i class="bi bi-star"></i>{% endif %}
+                                                    {% endfor %}
+                                                </span>
+                                            </td>
+                                            <td class="text-muted small" style="max-width: 360px;">{{ review.comment|truncatewords:18 }}</td>
+                                            <td>{{ review.created_at|date:"M d, Y" }}</td>
+                                            <td>
+                                                <div class="d-flex gap-2">
+                                                    <a href="{% url 'reviews:update' review.pk %}" class="btn btn-outline-primary btn-sm">Edit</a>
+                                                    <form method="post" action="{% url 'reviews:delete' review.pk %}">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this review?');">Delete</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-4">You have not reviewed any completed bookings yet.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payments Tab -->
+            <div class="tab-pane fade" id="payments" role="tabpanel" aria-labelledby="payments-tab">
+                <div class="card-premium p-4">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+                        <div>
+                            <h3 class="mb-1">Payment History</h3>
+                            <p class="text-muted small mb-0">Track paid, pending, failed, and refunded service payments.</p>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Payment</th>
+                                    <th>Service</th>
+                                    <th>Provider</th>
+                                    <th>Booking Status</th>
+                                    <th>Amount</th>
+                                    <th>Payment Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if payment_history %}
+                                    {% for payment in payment_history %}
+                                        <tr>
+                                            <td>#{{ payment.id }}</td>
+                                            <td><strong>{{ payment.booking.service.title }}</strong></td>
+                                            <td>{{ payment.booking.provider.full_name }}</td>
+                                            <td><span class="badge bg-{{ payment.booking.status_badge }}">{{ payment.booking.get_status_display }}</span></td>
+                                            <td>Rs. {{ payment.amount }}</td>
+                                            <td>
+                                                <span class="badge bg-{{ payment.status_badge }}">{{ payment.get_payment_status_display }}</span>
+                                                {% if payment.payment_status != 'PAID' %}
+                                                    <form action="{% url 'retry_payment' payment.id %}" method="post" class="d-inline ms-2">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-outline-primary btn-sm">Retry</button>
+                                                    </form>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ payment.created_at|date:"M d, Y - h:i A" }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">No payment history yet.</td>
                                     </tr>
                                 {% endif %}
                             </tbody>

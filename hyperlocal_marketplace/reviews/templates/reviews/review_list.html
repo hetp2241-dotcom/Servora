@@ -1,0 +1,67 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Reviews | HyperLocal{% endblock %}
+
+{% block content %}
+<div class="animate-fade-in">
+    <div class="card-premium p-4 mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+            <div>
+                <span class="text-uppercase text-muted small fw-semibold">Marketplace reviews</span>
+                <h1 class="h2 mt-2 mb-0">Reviews</h1>
+            </div>
+            <form method="get" class="d-flex flex-column flex-md-row gap-2">
+                <input type="search" name="q" class="form-control" placeholder="Search reviews" value="{{ search_query }}">
+                <select name="rating" class="form-select">
+                    <option value="">All ratings</option>
+                    {% for value in "12345"|make_list %}
+                        <option value="{{ value }}" {% if selected_rating == value %}selected{% endif %}>{{ value }} stars</option>
+                    {% endfor %}
+                </select>
+                <select name="sort" class="form-select">
+                    <option value="newest" {% if selected_sort == "newest" %}selected{% endif %}>Newest</option>
+                    <option value="oldest" {% if selected_sort == "oldest" %}selected{% endif %}>Oldest</option>
+                    <option value="rating_high" {% if selected_sort == "rating_high" %}selected{% endif %}>Highest rated</option>
+                    <option value="rating_low" {% if selected_sort == "rating_low" %}selected{% endif %}>Lowest rated</option>
+                </select>
+                <button type="submit" class="btn btn-gradient-primary rounded-pill">Filter</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        {% for review in reviews %}
+            <div class="col-md-6">
+                {% include 'reviews/review_card.html' with review=review %}
+                {% if user == review.customer %}
+                    <div class="mt-2 d-flex gap-2">
+                        <a href="{% url 'reviews:update' review.pk %}" class="btn btn-outline-primary btn-sm rounded-pill">Edit</a>
+                        <form method="post" action="{% url 'reviews:delete' review.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill" onclick="return confirm('Delete this review?');">Delete</button>
+                        </form>
+                    </div>
+                {% endif %}
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="card-premium p-5 text-center text-muted">No reviews match your filters.</div>
+            </div>
+        {% endfor %}
+    </div>
+
+    {% if is_paginated %}
+        <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&rating={{ selected_rating }}&sort={{ selected_sort }}&q={{ search_query }}">Previous</a></li>
+                {% endif %}
+                <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
+                {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&rating={{ selected_rating }}&sort={{ selected_sort }}&q={{ search_query }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+{% endblock %}

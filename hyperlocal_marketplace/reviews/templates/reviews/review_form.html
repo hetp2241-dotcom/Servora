@@ -1,0 +1,70 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}{% if is_update %}Edit Review{% else %}Write Review{% endif %} | HyperLocal{% endblock %}
+
+{% block extra_css %}
+    .review-form-shell { max-width: 860px; margin: 0 auto; }
+    .star-rating { display: inline-flex; flex-direction: row-reverse; gap: .35rem; }
+    .star-rating input { position: absolute; opacity: 0; pointer-events: none; }
+    .star-rating label { cursor: pointer; color: #cbd5e1; font-size: 2.1rem; transition: color .15s ease, transform .15s ease; }
+    .star-rating label:hover,
+    .star-rating label:hover ~ label,
+    .star-rating input:checked ~ label { color: #f59e0b; transform: translateY(-1px); }
+{% endblock %}
+
+{% block content %}
+<div class="review-form-shell animate-fade-in">
+    <div class="card-premium p-4 p-md-5">
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-4">
+            <div>
+                <span class="text-uppercase text-muted small fw-semibold">Verified booking review</span>
+                <h1 class="h2 mt-2 mb-1">{% if is_update %}Edit your review{% else %}How was the service?{% endif %}</h1>
+                <p class="text-muted mb-0">{{ booking.service.title }} with {{ booking.provider.full_name }}</p>
+            </div>
+            <span class="badge bg-success align-self-start rounded-pill px-3 py-2">
+                <i class="bi bi-patch-check-fill me-1"></i>Verified Booking
+            </span>
+        </div>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Rating</label>
+                <div class="star-rating d-flex justify-content-end justify-content-sm-start">
+                    {% for value in "54321" %}
+                        <input type="radio" name="rating" value="{{ value }}" id="star{{ value }}" {% if form.rating.value|stringformat:"s" == value %}checked{% endif %}>
+                        <label for="star{{ value }}" title="{{ value }} stars"><i class="bi bi-star-fill"></i></label>
+                    {% endfor %}
+                </div>
+                {% if form.rating.errors %}<div class="text-danger small mt-2">{{ form.rating.errors }}</div>{% endif %}
+            </div>
+
+            <div class="mb-4">
+                <label for="{{ form.comment.id_for_label }}" class="form-label fw-semibold">Review</label>
+                {{ form.comment }}
+                {% if form.comment.errors %}<div class="text-danger small mt-2">{{ form.comment.errors }}</div>{% endif %}
+            </div>
+
+            <div class="d-flex flex-column flex-sm-row gap-2">
+                <button type="submit" class="btn btn-gradient-primary rounded-pill">
+                    <i class="bi bi-send-check me-1"></i>{% if is_update %}Save Review{% else %}Publish Review{% endif %}
+                </button>
+                <a href="{% url 'customer_dashboard' %}#reviews" class="btn btn-outline-secondary rounded-pill">Cancel</a>
+            </div>
+        </form>
+
+        {% if object and object.pk %}
+            <form method="post" action="{% url 'reviews:delete' object.pk %}" class="mt-3">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger rounded-pill" onclick="return confirm('Delete this review?');">
+                    <i class="bi bi-trash me-1"></i>Delete Review
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

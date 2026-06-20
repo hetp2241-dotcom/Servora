@@ -124,6 +124,11 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="reviews-tab" data-bs-toggle="tab" data-bs-target="#reviews" type="button" role="tab" aria-controls="reviews" aria-selected="false">
+                    <i class="bi bi-star-fill me-2"></i>Reviews Received
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat-section" type="button" role="tab" aria-controls="chat-section" aria-selected="false">
                     <i class="bi bi-chat-dots-fill me-2"></i>Messages
                 </button>
@@ -151,6 +156,7 @@
                         <div class="btn-group" role="group" aria-label="Booking status filters">
                             <a href="?status=all" class="btn btn-sm {% if selected_status == 'all' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">All</a>
                             <a href="?status=PENDING" class="btn btn-sm {% if selected_status == 'PENDING' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">Pending</a>
+                            <a href="?status=CONFIRMED" class="btn btn-sm {% if selected_status == 'CONFIRMED' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">Confirmed</a>
                             <a href="?status=ACCEPTED" class="btn btn-sm {% if selected_status == 'ACCEPTED' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">Accepted</a>
                             <a href="?status=REJECTED" class="btn btn-sm {% if selected_status == 'REJECTED' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">Rejected</a>
                             <a href="?status=COMPLETED" class="btn btn-sm {% if selected_status == 'COMPLETED' %}btn-gradient-primary{% else %}btn-outline-secondary{% endif %}">Completed</a>
@@ -182,6 +188,8 @@
                                             <td>
                                                 {% if booking.status == 'PENDING' %}
                                                     <span class="badge bg-warning text-dark">Pending</span>
+                                                {% elif booking.status == 'CONFIRMED' %}
+                                                    <span class="badge bg-success">Paid & Confirmed</span>
                                                 {% elif booking.status == 'ACCEPTED' %}
                                                     <span class="badge bg-primary">Accepted</span>
                                                 {% elif booking.status == 'REJECTED' %}
@@ -195,13 +203,15 @@
                                                     <a href="?chat_with={{ booking.customer.id }}#chat-section" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('chat-tab').click();">
                                                         <i class="bi bi-chat-text"></i> Chat
                                                     </a>
-                                                    {% if booking.status == 'PENDING' %}
+                                                    {% if booking.status == 'CONFIRMED' %}
                                                         <a href="{% url 'update_booking_status' booking.id 'ACCEPTED' %}" class="btn btn-success btn-sm">
                                                             <i class="bi bi-check-lg"></i> Accept
                                                         </a>
                                                         <a href="{% url 'update_booking_status' booking.id 'REJECTED' %}" class="btn btn-danger btn-sm">
                                                             <i class="bi bi-x-lg"></i> Reject
                                                         </a>
+                                                    {% elif booking.status == 'PENDING' %}
+                                                        <span class="text-muted small">Awaiting payment</span>
                                                     {% elif booking.status == 'ACCEPTED' %}
                                                         <a href="{% url 'update_booking_status' booking.id 'COMPLETED' %}" class="btn btn-primary btn-sm">
                                                             <i class="bi bi-check2-all"></i> Mark Completed
@@ -307,6 +317,45 @@
                                 {% endif %}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reviews Tab -->
+            <div class="tab-pane fade" id="reviews" role="tabpanel" aria-labelledby="reviews-tab">
+                <div class="row g-4">
+                    <div class="col-lg-4">
+                        <div class="card-premium p-4 text-center h-100">
+                            <span class="text-uppercase text-muted small fw-semibold">Average rating</span>
+                            <h1 class="display-4 mt-3 mb-1">{{ review_stats.average_rating }}</h1>
+                            <p class="text-muted mb-3">{{ review_stats.review_count }} verified review{{ review_stats.review_count|pluralize }}</p>
+                            <a href="{% url 'reviews:provider_summary' user.pk %}" class="btn btn-outline-primary rounded-pill">Full Summary</a>
+                        </div>
+                    </div>
+                    <div class="col-lg-8">
+                        <div class="card-premium p-4 h-100">
+                            <h3 class="mb-3">Rating Breakdown</h3>
+                            {% for rating, count in review_stats.distribution.items %}
+                                <div class="d-flex align-items-center gap-3 mb-2">
+                                    <span class="text-muted small" style="width:70px;">{{ rating }} stars</span>
+                                    <div class="progress flex-grow-1 rounded-pill" style="height:10px;">
+                                        <div class="progress-bar bg-warning" style="width: {% if review_stats.review_count %}{% widthratio count review_stats.review_count 100 %}{% else %}0{% endif %}%;"></div>
+                                    </div>
+                                    <span class="small fw-semibold">{{ count }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="row g-4">
+                            {% for review in review_stats.latest_reviews %}
+                                <div class="col-md-6">{% include 'reviews/review_card.html' with review=review %}</div>
+                            {% empty %}
+                                <div class="col-12">
+                                    <div class="card-premium p-5 text-center text-muted">No customer reviews yet.</div>
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
             </div>

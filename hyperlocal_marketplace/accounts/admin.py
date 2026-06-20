@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from .forms import CustomUserCreationForm, CustomUserChangeForm
-from .models import Category, ProviderProfile, Service, Booking, Review, ChatMessage
+from .models import Category, ProviderProfile, Service, Booking, Payment, ChatMessage
 
 User = get_user_model()
 
@@ -58,10 +58,12 @@ class BookingAdmin(admin.ModelAdmin):
     search_fields = ('customer__full_name', 'provider__full_name', 'service__title')
 
 
-@admin.register(Review)
-class ReviewAdmin(admin.ModelAdmin):
-    list_display = ('booking', 'customer', 'provider', 'rating', 'created_at')
-    search_fields = ('customer__full_name', 'provider__full_name', 'booking__id')
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'booking', 'stripe_payment_id', 'amount', 'payment_status', 'created_at')
+    list_filter = ('payment_status',)
+    search_fields = ('stripe_payment_id', 'booking__customer__full_name', 'booking__service__name')
+    readonly_fields = ('created_at',)
 
 
 @admin.register(ChatMessage)

@@ -1,0 +1,59 @@
+{% extends 'accounts/base.html' %}
+
+{% block title %}Payment Cancelled | HyperLocal{% endblock %}
+
+{% block extra_css %}
+    .payment-shell {
+        max-width: 760px;
+        margin: 0 auto;
+    }
+
+    .cancel-ring {
+        width: 92px;
+        height: 92px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        margin: 0 auto 1.5rem;
+        background: #fff7ed;
+        color: #ea580c;
+    }
+{% endblock %}
+
+{% block content %}
+<div class="payment-shell animate-fade-in">
+    <div class="card-premium p-5 text-center">
+        <div class="cancel-ring">
+            <i class="bi bi-exclamation-circle fs-1"></i>
+        </div>
+        <span class="badge bg-{{ payment.status_badge }} mb-3">{{ payment.get_payment_status_display }}</span>
+        <h1 class="mb-3">Payment Cancelled</h1>
+        <p class="text-muted mb-4">Your booking for <strong>{{ booking.service.title }}</strong> has not been confirmed because payment was not completed.</p>
+
+        <div class="rounded-4 p-4 bg-light text-start mb-4">
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted">Booking</span>
+                <strong>#{{ booking.id }}</strong>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted">Total due</span>
+                <strong>Rs. {{ payment.amount }}</strong>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span class="text-muted">Booking status</span>
+                <strong>{{ booking.get_status_display }}</strong>
+            </div>
+        </div>
+
+        <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
+            <form action="{% url 'retry_payment' payment.id %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-gradient-primary rounded-pill">
+                    <i class="bi bi-arrow-repeat me-1"></i>Retry Payment
+                </button>
+            </form>
+            <a href="{% url 'service_detail' booking.service.id %}" class="btn btn-outline-secondary rounded-pill">Back to Service</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

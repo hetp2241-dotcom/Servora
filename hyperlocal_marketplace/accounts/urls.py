@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from hyperlocal_marketplace.reviews.views import CreateReviewView
 
 urlpatterns = [
     path('', views.ServiceListView.as_view(), name='home'),
@@ -23,10 +24,14 @@ urlpatterns = [
     
     # Booking actions
     path('book-service/<int:service_id>/', views.book_service, name='book_service'),
+    path('payments/success/', views.payment_success, name='payment_success'),
+    path('payments/cancel/<int:payment_id>/', views.payment_cancel, name='payment_cancel'),
+    path('payments/retry/<int:payment_id>/', views.retry_payment, name='retry_payment'),
+    path('payments/webhook/stripe/', views.stripe_webhook, name='stripe_webhook'),
     path('bookings/status/<int:booking_id>/<str:status>/', views.update_booking_status, name='update_booking_status'),
     
     # Review action
-    path('bookings/review/<int:booking_id>/', views.add_review, name='add_review'),
+    path('bookings/review/<int:booking_id>/', CreateReviewView.as_view(), name='add_review'),
     
     # Chat action
     path('chat/send/<int:receiver_id>/', views.send_chat_message, name='send_chat_message'),

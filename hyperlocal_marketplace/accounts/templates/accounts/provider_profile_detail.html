@@ -75,6 +75,31 @@
         </div>
 
         <div class="card-premium p-4 mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h4 class="mb-1">Customer Rating</h4>
+                    <p class="text-muted small mb-0">{{ rating_stats.review_count }} verified review{{ rating_stats.review_count|pluralize }}</p>
+                </div>
+                <a href="{% url 'reviews:provider_summary' profile.user.pk %}" class="btn btn-outline-primary btn-sm rounded-pill">View details</a>
+            </div>
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <h2 class="mb-0">{{ rating_stats.average_rating }}</h2>
+                <div class="text-warning">
+                    {% for i in "12345"|make_list %}<i class="bi bi-star-fill"></i>{% endfor %}
+                </div>
+            </div>
+            {% for rating, count in rating_stats.distribution.items %}
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <span class="small text-muted" style="width:70px;">{{ rating }} stars</span>
+                    <div class="progress flex-grow-1 rounded-pill" style="height:10px;">
+                        <div class="progress-bar bg-warning" style="width: {% if rating_stats.review_count %}{% widthratio count rating_stats.review_count 100 %}{% else %}0{% endif %}%;"></div>
+                    </div>
+                    <span class="small fw-semibold">{{ count }}</span>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="card-premium p-4 mt-4">
             <h4 class="mb-4">Services by {{ profile.full_name }}</h4>
             {% if services %}
                 <div class="row row-cols-1 row-cols-md-2 g-4">

@@ -56,7 +56,7 @@
                         <div class="meta-pill">Status: {{ service.is_available|yesno:'Available,Unavailable' }}</div>
                     </div>
                     <div class="d-flex flex-wrap gap-2">
-                        <a href="#booking-panel" class="btn btn-primary-glow btn-pill">Request booking</a>
+                        <a href="#booking-panel" class="btn btn-primary-glow btn-pill">Confirm Booking - Rs. {{ service.price }}</a>
                         <a href="{% url 'service_list' %}" class="btn btn-secondary-ghost btn-pill">Back to services</a>
                         {% if provider_profile %}
                             <a href="{% url 'provider_profile_detail' provider_profile.pk %}" class="btn btn-outline-primary btn-pill">Provider profile</a>
@@ -104,25 +104,7 @@
             {% if reviews %}
                 <div class="row g-3">
                     {% for review in reviews %}
-                        <div class="col-12 review-card p-4">
-                            <div class="d-flex justify-content-between align-items-start mb-3 gap-3 flex-wrap">
-                                <div>
-                                    <h5 class="mb-1">{{ review.customer.full_name }}</h5>
-                                    <div class="text-warning small">
-                                        {% for i in "12345"|make_list %}
-                                            {% if forloop.counter <= review.rating %}
-                                                <i class="bi bi-star-fill"></i>
-                                            {% else %}
-                                                <i class="bi bi-star"></i>
-                                            {% endif %}
-                                        {% endfor %}
-                                        <span class="ms-2 text-muted">{{ review.rating }} / 5</span>
-                                    </div>
-                                </div>
-                                <span class="text-muted small">{{ review.created_at|date:'M d, Y' }}</span>
-                            </div>
-                            <p class="mb-0 text-muted">{{ review.comment }}</p>
-                        </div>
+                        <div class="col-12">{% include 'reviews/review_card.html' with review=review %}</div>
                     {% endfor %}
                 </div>
             {% else %}
@@ -189,7 +171,17 @@
             </div>
             <hr>
             <div id="booking-panel">
-                <h5 class="mb-3">Book this service</h5>
+                <h5 class="mb-3">Confirm Booking</h5>
+                <div class="rounded-4 p-3 mb-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                    <div class="d-flex justify-content-between small text-muted mb-2">
+                        <span>Service price</span>
+                        <span>Rs. {{ service.price }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between fw-bold">
+                        <span>Total due today</span>
+                        <span>Rs. {{ service.price }}</span>
+                    </div>
+                </div>
                 {% if user.is_authenticated and user.role == 'CUSTOMER' %}
                     <form action="{% url 'book_service' service.pk %}" method="post">
                         {% csrf_token %}
@@ -201,16 +193,24 @@
                             <label for="notes" class="form-label">Booking notes</label>
                             {{ booking_form.notes }}
                         </div>
-                        <button type="submit" class="btn btn-gradient-primary w-100 rounded-pill">Submit booking request</button>
+                        <button type="submit" class="btn btn-gradient-primary w-100 rounded-pill">
+                            <i class="bi bi-credit-card me-1"></i>Confirm Booking
+                        </button>
+                        <p class="text-muted small mt-2 mb-0">You will be redirected to Stripe to complete payment.</p>
                     </form>
                 {% elif not user.is_authenticated %}
-                    <p class="text-muted">Please <a href="{% url 'login' %}?next={% url 'service_detail' service.pk %}">login</a> as a customer to book.</p>
+                    <a href="{% url 'login' %}?next={% url 'service_detail' service.pk %}" class="btn btn-gradient-primary w-100 rounded-pill">
+                        <i class="bi bi-box-arrow-in-right me-1"></i>Login to Confirm Booking
+                    </a>
                 {% else %}
-                    <p class="text-muted">Only customers may request bookings. Switch to a customer account to continue.</p>
+                    <button type="button" class="btn btn-outline-secondary w-100 rounded-pill" disabled>
+                        <i class="bi bi-lock me-1"></i>Confirm Booking
+                    </button>
+                    <p class="text-muted small mt-2 mb-0">Only customer accounts can confirm bookings and pay through Stripe.</p>
                 {% endif %}
             </div>
             <div class="alert alert-info py-3 mb-0" role="alert">
-                <strong>Payment placeholder:</strong> Razorpay integration will be added later after booking confirmation.
+                <strong>Secure checkout:</strong> Your booking is confirmed only after Stripe verifies payment.
             </div>
         </div>
     </div>

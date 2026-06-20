@@ -207,6 +207,7 @@ class Service(models.Model):
 class Booking(models.Model):
     class Status(models.TextChoices):
         PENDING = 'PENDING', _('Pending')
+        CONFIRMED = 'CONFIRMED', _('Confirmed')
         ACCEPTED = 'ACCEPTED', _('Accepted')
         REJECTED = 'REJECTED', _('Rejected')
         COMPLETED = 'COMPLETED', _('Completed')
@@ -229,22 +230,40 @@ class Booking(models.Model):
     def status_badge(self):
         return {
             self.Status.PENDING: 'warning',
+            self.Status.CONFIRMED: 'success',
             self.Status.ACCEPTED: 'primary',
             self.Status.REJECTED: 'danger',
             self.Status.COMPLETED: 'success',
         }.get(self.status, 'secondary')
 
 
-class Review(models.Model):
-    booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name='review')
-    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews_written')
-    provider = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews_received')
-    rating = models.IntegerField(choices=[(i, str(i)) for i in range(1, 6)])
-    comment = models.TextField()
+class Payment(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', _('Pending')
+        PAID = 'PAID', _('Paid')
+        FAILED = 'FAILED', _('Failed')
+        REFUNDED = 'REFUNDED', _('Refunded')
+
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='payments')
+    stripe_payment_id = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-created_at']
+
     def __str__(self):
-        return f"Review for Booking #{self.booking.id} - Rating: {self.rating}"
+        return f"Payment #{self.id} for Booking #{self.booking_id} - {self.get_payment_status_display()}"
+
+    @property
+    def status_badge(self):
+        return {
+            self.Status.PENDING: 'warning',
+            self.Status.PAID: 'success',
+            self.Status.FAILED: 'danger',
+            self.Status.REFUNDED: 'secondary',
+        }.get(self.payment_status, 'secondary')
 
 
 class ChatMessage(models.Model):
