@@ -17,7 +17,7 @@ def get_stripe_module():
     if not settings.STRIPE_SECRET_KEY:
         raise ImproperlyConfigured('STRIPE_SECRET_KEY is not configured.')
 
-    stripe.api_key =os.getenv('STRIPE_SECRET_KEY', '')
+    stripe.api_key ='' + settings.STRIPE_SECRET_KEY
     return stripe
 
 

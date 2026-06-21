@@ -1,17 +1,7 @@
-# TODO - Frontend Notifications UI
+# TODO
 
-## Goal
-Implement ONLY the missing frontend notification layer.
-
-## Steps
-- [ ] Inspect existing notification read endpoint (accounts/urls.py, accounts/views.py)
-- [ ] If none exists: create minimal endpoint POST /notifications/<notification_id>/read/ (login required, only recipient)
-- [ ] Update base template with bell icon + unread badge + dropdown UI + empty state
-- [ ] Add WebSocket client to customer_dashboard.html and provider_dashboard.html:
-  - [ ] connect to /ws/notifications/
-  - [ ] send {"action":"get_latest"}
-  - [ ] handle notifications.latest and notifications.new
-- [ ] Implement realtime dropdown rendering & badge updates (max 20, newest first)
-- [ ] Implement mark-as-read on notification item click only
-- [ ] Manual testing checklist and verification results
+- [x] Fix TemplateSyntaxError in `provider_profile_list.html` by removing dependency on non-existent `get_item` template filter.
+- [x] Update `ProviderProfileListView.get_context_data` to attach `average_rating`, `review_count`, and `jobs_completed` to each `profiles` item.
+- [x] Update `provider_profile_list.html` to read `profile.average_rating`, `profile.review_count`, `profile.jobs_completed`.
+- [ ] Quick sanity check: ensure pages render without `get_item` usage.
 

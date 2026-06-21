@@ -38,8 +38,13 @@
                     <p class="mb-0">{{ profile.experience_years }} years</p>
                 </div>
                 <div>
-                    <h6 class="text-muted mb-1">Verified</h6>
-                    <p class="mb-0">{{ profile.is_verified|yesno:"Yes,No" }}</p>
+                    {% if profile.is_verified %}
+                        <span class="badge bg-success bg-opacity-15 text-success rounded-pill py-2 px-3">
+                            <i class="bi bi-patch-check-fill me-1"></i> Verified Provider
+                        </span>
+                    {% else %}
+                        <span class="badge bg-secondary bg-opacity-15 text-secondary rounded-pill py-2 px-3">Not verified</span>
+                    {% endif %}
                 </div>
                 <div>
                     <h6 class="text-muted mb-1">Profile Score</h6>
@@ -47,34 +52,53 @@
                 </div>
             </div>
         </div>
+
     </div>
 
     <div class="col-lg-8 mb-4">
         <div class="card-premium p-4">
-            <h4 class="mb-4">About {{ profile.full_name }}</h4>
-            <p class="text-muted">{{ profile.description|default:'No description available yet.' }}</p>
-            <hr>
+            <h4 class="mb-4">Trust & Reputation</h4>
+            <p class="text-muted mb-4">Provider credibility snapshot based on verified status, ratings, and completed jobs.</p>
+
             <div class="row gy-3">
-                <div class="col-md-6">
-                    <h6 class="text-muted mb-1">Phone</h6>
-                    <p class="mb-0">{{ profile.phone_number|default:'Not provided' }}</p>
+                <div class="col-12">
+                    {% if profile.is_verified %}
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-success bg-opacity-15 text-success rounded-pill py-2 px-3">
+                                <i class="bi bi-patch-check-fill me-1"></i> Verified Provider
+                            </span>
+                        </div>
+                    {% else %}
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-secondary bg-opacity-15 text-secondary rounded-pill py-2 px-3">Not verified</span>
+                        </div>
+                    {% endif %}
                 </div>
+
                 <div class="col-md-6">
-                    <h6 class="text-muted mb-1">City</h6>
-                    <p class="mb-0">{{ profile.city|default:'Not provided' }}</p>
+                    <h6 class="text-muted mb-1">Average Rating</h6>
+                    <p class="mb-0"><span class="text-warning">⭐</span> {{ rating_stats.average_rating|floatformat:1 }} / 5</p>
                 </div>
+
                 <div class="col-md-6">
-                    <h6 class="text-muted mb-1">Address</h6>
-                    <p class="mb-0">{{ profile.address|default:'Not provided' }}</p>
+                    <h6 class="text-muted mb-1">Total Reviews</h6>
+                    <p class="mb-0">{{ rating_stats.review_count }} review{{ rating_stats.review_count|pluralize }}</p>
                 </div>
+
                 <div class="col-md-6">
-                    <h6 class="text-muted mb-1">Verified Provider</h6>
-                    <p class="mb-0">{{ profile.is_verified|yesno:"Yes,No" }}</p>
+                    <h6 class="text-muted mb-1">Jobs Completed</h6>
+                    <p class="mb-0">{{ jobs_completed }} job{{ jobs_completed|pluralize }}</p>
+                </div>
+
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-1">Member Since</h6>
+                    <p class="mb-0">{{ member_since|date:'M d, Y' }}</p>
                 </div>
             </div>
         </div>
 
         <div class="card-premium p-4 mt-4">
+
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
                     <h4 class="mb-1">Customer Rating</h4>

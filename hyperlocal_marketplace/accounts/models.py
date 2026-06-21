@@ -282,6 +282,18 @@ class ChatMessage(models.Model):
         return f"Message from {self.sender.full_name} to {self.receiver.full_name} at {self.timestamp}"
 
 
+class ProcessedStripeEvent(models.Model):
+    stripe_event_id = models.CharField(max_length=255, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Processed Stripe Event'
+        verbose_name_plural = 'Processed Stripe Events'
+
+    def __str__(self):
+        return self.stripe_event_id
+
+
 class Notification(models.Model):
     class Type(models.TextChoices):
         NEW_BOOKING = 'NEW_BOOKING', 'New booking'

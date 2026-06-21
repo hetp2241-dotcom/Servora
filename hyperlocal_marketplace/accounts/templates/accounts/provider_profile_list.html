@@ -39,7 +39,18 @@
                                 <p class="text-muted small mb-0">{{ profile.city }}{% if profile.city and profile.address %}, {% endif %}{{ profile.address }}</p>
                             </div>
                         </div>
+                        {% if profile.is_verified %}
+                            <div class="mb-2">
+                                <span class="badge bg-success bg-opacity-15 text-success rounded-pill py-1 px-2 small">✓ Verified Provider</span>
+                            </div>
+                        {% endif %}
+                        <div class="mb-2 d-flex flex-wrap gap-2 align-items-center">
+                            <span class="rating-pill"><i class="bi bi-star-fill"></i> {{ profile.average_rating|default:0|floatformat:1 }} ({{ profile.review_count|default:0 }})</span>
+                            <span class="text-muted small">🔧 Jobs completed: {{ profile.jobs_completed|default:0 }}</span>
+                        </div>
                         <p class="text-muted small mb-4">{{ profile.description|truncatewords:20 }}</p>
+
+
                     </div>
                     <div class="d-flex justify-content-between align-items-center gap-3">
                         <div>

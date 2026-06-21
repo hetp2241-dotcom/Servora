@@ -30,6 +30,7 @@ from .models import (
     Booking,
     Payment,
     ChatMessage,
+    Notification,
 )
 from .decorators import role_required
 from .stripe_config import create_checkout_session, get_stripe_module
@@ -275,14 +276,18 @@ class ServiceDetailView(DetailView):
         context['booking_form'] = BookingForm()
         context['provider_profile'] = getattr(self.object.provider, 'provider_profile', None)
         context['now'] = timezone.now()
+        # Customer reviews are service-scoped, but trust signals must be provider-wide.
         reviews = Review.objects.filter(booking__service=self.object).select_related('customer', 'provider').order_by('-created_at')
         context['reviews'] = reviews
-        context['average_rating'] = reviews.aggregate(avg=Avg('rating'))['avg'] or 0
-        context['total_reviews'] = reviews.count()
-        if self.object.provider_id:
-            context['provider_rating_stats'] = provider_statistics(self.object.provider)
-        context['related_services'] = self.object.provider.services.filter(is_available=True).exclude(pk=self.object.pk)[:4]
+
+        provider = self.object.provider
+        context['provider_rating_stats'] = provider_statistics(provider)
+        context['average_rating'] = context['provider_rating_stats']['average_rating']
+        context['total_reviews'] = context['provider_rating_stats']['review_count']
+
+        context['related_services'] = provider.services.filter(is_available=True).exclude(pk=self.object.pk)[:4]
         return context
+
 
 
 class ProviderProfileListView(ListView):
@@ -292,7 +297,58 @@ class ProviderProfileListView(ListView):
     paginate_by = 12
 
     def get_queryset(self):
-        return ProviderProfile.objects.select_related('user').order_by('-is_verified', 'full_name')
+        # Avoid N+1 by selecting related provider User + provider rating_stats.
+        return (
+            ProviderProfile.objects
+            .select_related('user', 'user__rating_stats')
+            .order_by('-is_verified', 'full_name')
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Trust signals: reuse cached ProviderRatingStats when present.
+        # Jobs completed: Booking count for completed only.
+        profiles = context.get('profiles') or []
+        provider_ids = [p.user_id for p in profiles]
+
+        # Jobs completed (bulk)
+        jobs_completed_by_provider = {
+            row['provider_id']: row['jobs_completed']
+            for row in Booking.objects.filter(
+                provider_id__in=provider_ids,
+                status=Booking.Status.COMPLETED,
+            ).values('provider_id')
+            .annotate(jobs_completed=Count('id'))
+        }
+
+        # Ratings (ProviderRatingStats cached)
+        providers = User.objects.filter(id__in=provider_ids).select_related('rating_stats')
+        rating_stats_by_provider = {u.id: u.rating_stats for u in providers}
+
+        # Refresh only missing stats
+        missing_ids = [
+            pid for pid in provider_ids
+            if pid not in rating_stats_by_provider or rating_stats_by_provider.get(pid) is None
+        ]
+        if missing_ids:
+            from hyperlocal_marketplace.reviews.services import refresh_provider_statistics
+            for pid in missing_ids:
+                refresh_provider_statistics(User.objects.get(pk=pid))
+            providers = User.objects.filter(id__in=provider_ids).select_related('rating_stats')
+            rating_stats_by_provider = {u.id: u.rating_stats for u in providers}
+
+        # Attach computed fields to each profile so templates don't need
+        # dict lookups via custom filters.
+        for p in profiles:
+            stats = rating_stats_by_provider.get(p.user_id)
+            p.average_rating = getattr(stats, 'average_rating', 0) or 0
+            p.review_count = getattr(stats, 'review_count', 0) or 0
+            p.jobs_completed = jobs_completed_by_provider.get(p.user_id, 0) or 0
+
+        return context
+
+
 
 
 class ProviderProfileDetailView(DetailView):
@@ -302,9 +358,18 @@ class ProviderProfileDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['services'] = self.object.user.services.filter(is_available=True).select_related('category')
-        context['rating_stats'] = provider_statistics(self.object.user)
+        provider_user = self.object.user
+
+        context['services'] = provider_user.services.filter(is_available=True).select_related('category')
+        context['rating_stats'] = provider_statistics(provider_user)
+
+        context['jobs_completed'] = Booking.objects.filter(
+            provider=provider_user,
+            status=Booking.Status.COMPLETED,
+        ).count()
+        context['member_since'] = self.object.created_at
         return context
+
 
 
 @login_required
@@ -368,18 +433,58 @@ def customer_dashboard(request):
     # Build provider list for the customer “Nearby Service Providers” map.
     # We also include a service category (if the provider has services), otherwise fallback to empty.
     providers_json = []
+
+    # Bulk compute jobs completed + use cached ProviderRatingStats to avoid N+1.
+    provider_ids = [p.id for p in providers]
+    jobs_completed_by_provider = {
+        row['provider_id']: row['jobs_completed']
+        for row in Booking.objects.filter(
+            provider_id__in=provider_ids,
+            status=Booking.Status.COMPLETED,
+        ).values('provider_id')
+         .annotate(jobs_completed=Count('id'))
+    }
+
+    rating_stats_qs = User.objects.filter(id__in=provider_ids).select_related('rating_stats')
+    rating_stats_by_provider = {
+        u.id: getattr(u, 'rating_stats', None)
+        for u in rating_stats_qs
+    }
+
+    # Refresh missing rating stats only.
+    missing_ids = [pid for pid in provider_ids if not rating_stats_by_provider.get(pid)]
+    if missing_ids:
+        from hyperlocal_marketplace.reviews.services import refresh_provider_statistics
+        for pid in missing_ids:
+            refresh_provider_statistics(User.objects.get(pk=pid))
+        # Re-fetch after refresh to safely read rating_stats
+        rating_stats_qs = User.objects.filter(id__in=provider_ids).select_related('rating_stats')
+        rating_stats_by_provider = {
+            u.id: getattr(u, 'rating_stats', None)
+            for u in rating_stats_qs
+        }
+
+
     for p in providers:
         provider_profile = getattr(p, 'provider_profile', None)
         if not provider_profile:
             continue
+
         first_service = p.services.select_related('category').filter(is_available=True).first()
+        stats = rating_stats_by_provider.get(p.id)
+
         providers_json.append({
             'latitude': float(provider_profile.latitude),
             'longitude': float(provider_profile.longitude),
             'provider_name': p.full_name,
+            'is_verified': bool(provider_profile.is_verified),
+            'average_rating': float(getattr(stats, 'average_rating', 0) or 0),
+            'review_count': int(getattr(stats, 'review_count', 0) or 0),
             'service_category': (first_service.category.name if first_service and first_service.category else ''),
             'address': provider_profile.address or '',
         })
+
+
 
     # Serialize to strict JSON so the template can safely embed it into a data-* attribute
     # and the client-side code can do JSON.parse(...) successfully.
@@ -661,13 +766,17 @@ def payment_success(request):
         messages.warning(request, 'Payment verification is still pending. We will update your booking shortly.')
         return render(request, 'accounts/payment_success.html', {'payment': payment, 'booking': payment.booking})
 
-    if session.payment_status == 'paid':
-        _mark_payment_paid(payment, getattr(session, 'payment_intent', '') or session_id)
-        payment.refresh_from_db()
+    # Source of truth is the webhook; do not mark paid directly here.
+    payment.refresh_from_db()
+    if payment.payment_status == Payment.Status.PAID:
         messages.success(request, 'Payment successful. Your booking is confirmed.')
     else:
-        logger.warning('Stripe success return had non-paid status=%s for payment_id=%s', session.payment_status, payment.id)
-        messages.info(request, 'Payment is still processing. Your booking will confirm after Stripe completes it.')
+        logger.info(
+            'Payment success redirect without PAID state in DB yet for payment_id=%s (stripe_payment_status=%s).',
+            payment.id,
+            getattr(session, 'payment_status', None),
+        )
+        messages.info(request, 'Payment is being finalized. Your booking will confirm after Stripe completes it.')
 
     return render(request, 'accounts/payment_success.html', {'payment': payment, 'booking': payment.booking})
 
@@ -715,6 +824,7 @@ def retry_payment(request, payment_id):
 
 
 @csrf_exempt
+@require_POST
 def stripe_webhook(request):
     payload = request.body
     signature = request.META.get('HTTP_STRIPE_SIGNATURE', '')
@@ -736,6 +846,15 @@ def stripe_webhook(request):
     event_type = event.get('type')
     event_object = event.get('data', {}).get('object', {})
     logger.info('Stripe webhook received: %s', event_type)
+
+    # MF1: Stripe webhook replay protection (event-level)
+    event_id = event.get('id')
+    if event_id:
+        # Skip processing if we've already handled this Stripe event.
+        from .models import ProcessedStripeEvent
+        if ProcessedStripeEvent.objects.filter(stripe_event_id=event_id).exists():
+            return JsonResponse({'status': 'ok'})
+        ProcessedStripeEvent.objects.create(stripe_event_id=event_id)
 
     if event_type == 'checkout.session.completed':
         payment_id = event_object.get('metadata', {}).get('payment_id')
