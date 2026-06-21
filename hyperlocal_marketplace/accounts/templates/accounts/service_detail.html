@@ -158,6 +158,14 @@
                     <p class="text-muted small mb-0">{% if provider_profile %}{{ provider_profile.city }}{% else %}Location unavailable{% endif %}</p>
                 </div>
             </div>
+
+            {% if provider_profile %}
+                <div class="mb-4">
+                    <h6 class="section-card-title mb-2">Service location</h6>
+                    {% include 'components/provider_map.html' with latitude=provider_profile.latitude longitude=provider_profile.longitude provider_name=service.provider.full_name service_name=service.title service_category=service.category.name address=provider_profile.address map_id='service_provider_map_{{ service.id }}' %}
+                </div>
+            {% endif %}
+
             <div class="mb-3">
                 <span class="text-muted small">Experience</span>
                 <p class="mb-1">{{ provider_profile.experience_years|default:'0' }} years</p>

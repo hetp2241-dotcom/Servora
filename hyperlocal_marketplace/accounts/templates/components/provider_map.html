@@ -1,0 +1,93 @@
+{# Reusable Leaflet map component for provider locations #}
+
+{% comment %}
+Inputs expected:
+- latitude
+- longitude
+- provider_name
+- service_name
+- service_category
+- address
+- map_id
+- zoom (optional)
+{% endcomment %}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+<div
+  id="{{ map_id }}"
+  class="hl-provider-map"
+  data-latitude="{{ latitude }}"
+  data-longitude="{{ longitude }}"
+  data-provider-name="{{ provider_name|default:'' }}"
+  data-service-name="{{ service_name|default:'' }}"
+  data-service-category="{{ service_category|default:'' }}"
+  data-address="{{ address|default:'' }}"
+  data-zoom="{{ zoom|default:13 }}"
+></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+(function() {
+  function safeNumber(v) {
+    var n = parseFloat(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  var el = document.getElementById('{{ map_id }}');
+  if (!el) return;
+
+  var lat = safeNumber(el.getAttribute('data-latitude'));
+  var lng = safeNumber(el.getAttribute('data-longitude'));
+  if (lat === null || lng === null) return;
+
+  var zoom = parseInt(el.getAttribute('data-zoom'), 10) || 13;
+
+  // Create map
+  var map = L.map('{{ map_id }}', { zoomControl: true }).setView([lat, lng], zoom);
+
+  // OpenStreetMap tiles
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  // Marker
+  var providerName = el.getAttribute('data-provider-name') || '';
+  var serviceName = el.getAttribute('data-service-name') || '';
+  var serviceCategory = el.getAttribute('data-service-category') || '';
+  var address = el.getAttribute('data-address') || '';
+
+  var marker = L.marker([lat, lng]).addTo(map);
+
+  var popupHtml =
+    '<div style="font-size: 0.95rem;">' +
+      '<div style="font-weight:700; margin-bottom:4px;">' + (providerName || 'Provider') + '</div>' +
+      (serviceName ? '<div><b>Service</b>: ' + serviceName + '</div>' : '') +
+      (serviceCategory ? '<div><b>Category</b>: ' + serviceCategory + '</div>' : '') +
+      (address ? '<div style="margin-top:4px;"><b>Address</b>: ' + address + '</div>' : '') +
+    '</div>';
+
+  marker.bindPopup(popupHtml);
+  marker.openPopup();
+})();
+</script>
+
+<style>
+  .hl-provider-map {
+    width: 100%;
+    min-height: 400px;
+    height: 400px;
+    border-radius: 18px;
+    overflow: hidden;
+  }
+
+  @media (max-width: 767px) {
+    .hl-provider-map {
+      height: 300px;
+      min-height: 300px;
+    }
+  }
+</style>
+

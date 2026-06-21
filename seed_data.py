@@ -9,8 +9,10 @@ from hyperlocal_marketplace.accounts.models import (
     ProviderProfile,
     Service,
     Booking,
-    Review,
 )
+
+from hyperlocal_marketplace.reviews.models import Review
+
 
 PROVIDER_CITY_CHOICES = [
     'Ahmedabad',
@@ -143,6 +145,15 @@ def make_provider_description():
     return random.choice(PROVIDER_DESCRIPTIONS)
 
 
+def make_ahmedabad_latitude():
+    return round(random.uniform(23.000000, 23.100000), 6)
+
+
+def make_ahmedabad_longitude():
+    return round(random.uniform(72.500000, 72.700000), 6)
+
+
+
 def make_service_description(service_name, category_name):
     return f'{service_name} by a verified {category_name.lower()} specialist. Reliable service with transparent pricing and a satisfaction guarantee.'
 
@@ -197,24 +208,37 @@ def seed_providers(count=50):
             provider.set_password('provider123')
             provider.save()
 
+        # Ensure realistic Ahmedabad coordinates (not identical for all providers)
+        default_lat = make_ahmedabad_latitude()
+        default_lng = make_ahmedabad_longitude()
+
         profile, _ = ProviderProfile.objects.get_or_create(
             user=provider,
             defaults={
                 'full_name': provider.full_name,
                 'phone_number': provider.phone_number,
-                'city': random.choice(PROVIDER_CITY_CHOICES),
+                'city': 'Ahmedabad',
                 'address': make_address(),
+                'latitude': default_lat,
+                'longitude': default_lng,
                 'experience_years': random.randint(1, 15),
                 'description': make_provider_description(),
                 'is_verified': True,
             },
         )
-        profile.city = profile.city or random.choice(PROVIDER_CITY_CHOICES)
+
+        # Always refresh coordinates so older seed runs get proper randomized Ahmedabad values.
+        # Do NOT overwrite address if it already exists.
+        profile.city = profile.city or 'Ahmedabad'
         profile.address = profile.address or make_address()
+        profile.latitude = default_lat
+        profile.longitude = default_lng
+
         profile.experience_years = profile.experience_years or random.randint(1, 15)
         profile.description = profile.description or make_provider_description()
         profile.is_verified = True
         profile.save()
+
 
         providers.append(provider)
     return providers

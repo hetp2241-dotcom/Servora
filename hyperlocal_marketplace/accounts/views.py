@@ -315,10 +315,19 @@ def provider_profile_edit(request):
 @role_required('CUSTOMER')
 def customer_dashboard(request):
     services = Service.objects.filter(is_available=True).select_related('provider', 'category')[:8]
+
+    providers = (
+        User.objects.filter(role=User.Role.PROVIDER)
+        .select_related('provider_profile')
+        .exclude(provider_profile__latitude__isnull=True)
+        .exclude(provider_profile__longitude__isnull=True)
+    )
+
     status_filter = request.GET.get('status', 'all').upper()
     bookings = Booking.objects.filter(customer=request.user).select_related('service', 'provider').prefetch_related('payments').annotate(
         has_review=Exists(Review.objects.filter(booking_id=OuterRef('pk')))
     )
+
     if status_filter in Booking.Status.values:
         bookings = bookings.filter(status=status_filter)
     bookings = bookings.order_by('-created_at')
@@ -327,8 +336,8 @@ def customer_dashboard(request):
         'booking__service',
         'booking__provider',
     ).order_by('-created_at')
-    providers = User.objects.filter(role=User.Role.PROVIDER)
     my_reviews = Review.objects.filter(customer=request.user).select_related('booking', 'booking__service', 'provider').order_by('-created_at')
+
     selected_status = status_filter if status_filter in Booking.Status.values else 'all'
 
     chat_partner_id = request.GET.get('chat_with')
@@ -342,10 +351,36 @@ def customer_dashboard(request):
                 Q(sender=chat_partner, receiver=request.user)
             ).order_by('timestamp')
 
+    # Build provider list for the customer “Nearby Service Providers” map.
+    # We also include a service category (if the provider has services), otherwise fallback to empty.
+    providers_json = []
+    for p in providers:
+        provider_profile = getattr(p, 'provider_profile', None)
+        if not provider_profile:
+            continue
+        first_service = p.services.select_related('category').filter(is_available=True).first()
+        providers_json.append({
+            'latitude': float(provider_profile.latitude),
+            'longitude': float(provider_profile.longitude),
+            'provider_name': p.full_name,
+            'service_category': (first_service.category.name if first_service and first_service.category else ''),
+            'address': provider_profile.address or '',
+        })
+
+    # Serialize to strict JSON so the template can safely embed it into a data-* attribute
+    # and the client-side code can do JSON.parse(...) successfully.
+    import json
+    nearby_providers_json = json.dumps(providers_json)
+
+
+
     context = {
         'services': services,
         'bookings': bookings,
         'providers': providers,
+        'nearby_providers_json': nearby_providers_json,
+
+
         'chat_partner': chat_partner,
         'chat_messages': chat_messages,
         'selected_status': selected_status,
