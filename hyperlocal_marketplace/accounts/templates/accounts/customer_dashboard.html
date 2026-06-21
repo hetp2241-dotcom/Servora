@@ -509,16 +509,17 @@
                                 </div>
                                 
                                 <div class="chat-footer">
-                                    <form action="{% url 'send_chat_message' chat_partner.id %}" method="POST">
+                                    <form id="chat-form" action="{% url 'send_chat_message' chat_partner.id %}" method="POST">
                                         {% csrf_token %}
                                         <div class="input-group">
-                                            <input type="text" name="message" class="form-control border-end-0 py-2" placeholder="Type a message..." required autocomplete="off">
-                                            <button type="submit" class="btn btn-gradient-primary px-4">
+                                            <input id="chat-input" type="text" name="message" class="form-control border-end-0 py-2" placeholder="Type a message..." required autocomplete="off">
+                                            <button type="submit" class="btn btn-gradient-primary px-4" id="chat-send-btn">
                                                 <i class="bi bi-send-fill"></i>
                                             </button>
                                         </div>
                                     </form>
                                 </div>
+
                             </div>
                         {% else %}
                             <div class="card-premium p-5 text-center h-100 d-flex flex-column justify-content-center align-items-center">
@@ -553,7 +554,7 @@
                 tabBtn.click();
             }
         }
-        
+
         // Update URL hash on tab change
         var tabButtons = document.querySelectorAll('button[data-bs-toggle="tab"]');
         tabButtons.forEach(function(btn) {
@@ -561,6 +562,63 @@
                 window.location.hash = event.target.getAttribute('data-bs-target');
             });
         });
+
+        // ---- Real-time chat (Django Channels) ----
+        var chatForm = document.getElementById('chat-form');
+        var chatInput = document.getElementById('chat-input');
+        var partnerId = {{ chat_partner.id|default:"null" }};
+
+        function appendMessage(messageObj) {
+            var container = document.getElementById('chat-messages-container');
+            if (!container) return;
+
+            // If initial UI had "No messages yet" placeholder, remove it.
+            var placeholder = container.querySelector('.my-auto');
+            if (placeholder) placeholder.remove();
+
+            var bubble = document.createElement('div');
+            bubble.className = 'chat-message-bubble ' + (messageObj.sender_id === {{ request.user.id|default:"-1" }} ? 'chat-message-sent' : 'chat-message-received');
+            bubble.innerHTML = '<div>' + messageObj.message + '</div>' +
+                '<div class="text-end small mt-1" style="font-size: 0.65rem; opacity: 0.8;">' +
+                (messageObj.timestamp ? new Date(messageObj.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) : '') +
+                '</div>';
+
+            container.appendChild(bubble);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        if (chatForm && partnerId !== null) {
+            var scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            var wsUrl = scheme + '://' + window.location.host + '/ws/chat/' + partnerId + '/';
+
+            var socket = new WebSocket(wsUrl);
+
+            socket.onmessage = function(event) {
+                try {
+                    var data = JSON.parse(event.data);
+                    if (data.type === 'chat.message' && data.message) {
+                        appendMessage(data.message);
+                    }
+                } catch (e) {}
+            };
+
+            socket.onopen = function() {
+                chatInput && chatInput.focus();
+            };
+
+            chatForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                var messageText = (chatInput.value || '').trim();
+                if (!messageText) return;
+
+                if (socket.readyState !== WebSocket.OPEN) return;
+
+                socket.send(JSON.stringify({ message: messageText }));
+                chatInput.value = '';
+            });
+        }
     });
 </script>
 {% endblock %}
+
