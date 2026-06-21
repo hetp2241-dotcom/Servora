@@ -1,10 +1,17 @@
-# TODO
+# TODO - Frontend Notifications UI
 
-## Nearby providers map JSON serialization fix
-- [x] Update `customer_dashboard` view to serialize `nearby_providers_json` as strict JSON.
-- [x] Render the serialized JSON into `data-providers` so JS `JSON.parse(...)` succeeds.
+## Goal
+Implement ONLY the missing frontend notification layer.
 
-- [x] Keep map/marker/clustering/popup logic unchanged.
-- [ ] Run Django checks/tests (or minimal sanity run) to confirm no template/render errors.
-
+## Steps
+- [ ] Inspect existing notification read endpoint (accounts/urls.py, accounts/views.py)
+- [ ] If none exists: create minimal endpoint POST /notifications/<notification_id>/read/ (login required, only recipient)
+- [ ] Update base template with bell icon + unread badge + dropdown UI + empty state
+- [ ] Add WebSocket client to customer_dashboard.html and provider_dashboard.html:
+  - [ ] connect to /ws/notifications/
+  - [ ] send {"action":"get_latest"}
+  - [ ] handle notifications.latest and notifications.new
+- [ ] Implement realtime dropdown rendering & badge updates (max 20, newest first)
+- [ ] Implement mark-as-read on notification item click only
+- [ ] Manual testing checklist and verification results
 

@@ -39,4 +39,8 @@ urlpatterns = [
     # Admin actions
     path('admin/toggle-user/<int:user_id>/', views.admin_toggle_user, name='admin_toggle_user'),
     path('admin/delete-review/<int:review_id>/', views.admin_delete_review, name='admin_delete_review'),
+
+    # Notifications
+    path('notifications/<int:notification_id>/read/', views.mark_notification_as_read, name='mark_notification_as_read'),
 ]
+

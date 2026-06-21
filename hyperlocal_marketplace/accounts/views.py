@@ -53,7 +53,21 @@ def _mark_payment_paid(payment, stripe_payment_id=''):
         payment.save(update_fields=['payment_status', 'stripe_payment_id'])
         booking.status = Booking.Status.CONFIRMED
         booking.save(update_fields=['status'])
+
+        # BOOKING_CONFIRMED notification (customer receives)
+        from .notifications import create_notification_and_dispatch
+        create_notification_and_dispatch(
+            recipient=booking.customer,
+            actor=booking.provider,
+            type='BOOKING_CONFIRMED',
+            title='Booking confirmed',
+            message=f"Your booking #{booking.id} has been confirmed.",
+            link=f"/customer-dashboard/#bookings",
+            idempotency_key=f"BOOKING_CONFIRMED:{booking.id}",
+        )
+
     logger.info('Payment marked paid for booking_id=%s payment_id=%s', booking.id, payment.id)
+
     return payment
 
 
@@ -586,7 +600,22 @@ def book_service(request, service_id):
                 )
 
             try:
+                # NEW_BOOKING notification (provider receives)
+                # Deterministic idempotency key: one per booking.
+                from .notifications import create_notification_and_dispatch
+                create_notification_and_dispatch(
+                    recipient=service.provider,
+                    actor=request.user,
+                    type='NEW_BOOKING',
+                    title='New booking',
+                    message=f"New booking request for {service.name}",
+                    link=f"/provider-dashboard/#bookings",
+                    idempotency_key=f"NEW_BOOKING:{booking.id}",
+                )
+
                 checkout_session = create_checkout_session(request, payment)
+
+
             except ImproperlyConfigured as exc:
                 logger.exception('Stripe checkout configuration error for payment_id=%s', payment.id)
                 _mark_payment_failed(payment)
@@ -747,7 +776,22 @@ def update_booking_status(request, booking_id, status):
     if status in Booking.Status.values:
         booking.status = status
         booking.save()
+
+        if booking.status == Booking.Status.REJECTED:
+            # BOOKING_REJECTED notification (customer only)
+            from .notifications import create_notification_and_dispatch
+            create_notification_and_dispatch(
+                recipient=booking.customer,
+                actor=booking.provider,
+                type='BOOKING_REJECTED',
+                title='Booking rejected',
+                message=f"Your booking #{booking.id} was rejected.",
+                link=f"/customer-dashboard/#bookings",
+                idempotency_key=f"BOOKING_REJECTED:{booking.id}",
+            )
+
         messages.success(request, f"Booking status updated to: {booking.get_status_display()}")
+
     else:
         messages.error(request, 'Invalid status chosen.')
 
@@ -789,3 +833,26 @@ def admin_toggle_user(request, user_id):
 def admin_delete_review(request, review_id):
     messages.error(request, 'Direct admin review deletion is disabled.')
     return redirect('admin_dashboard')
+
+
+@login_required
+def mark_notification_as_read(request, notification_id: int):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Invalid method'}, status=405)
+
+    try:
+        notification = Notification.objects.select_for_update().get(pk=notification_id)
+    except Notification.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Notification not found'}, status=404)
+
+    # Only recipient can mark their own notifications.
+    if notification.recipient_id != request.user.id:
+        return JsonResponse({'success': False, 'error': 'Forbidden'}, status=403)
+
+    if notification.read_at is None:
+        notification.read_at = timezone.now()
+        notification.save(update_fields=['read_at'])
+
+    unread_count = Notification.objects.filter(recipient=request.user, read_at__isnull=True).count()
+    return JsonResponse({'success': True, 'unread_count': unread_count})
+

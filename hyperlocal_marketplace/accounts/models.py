@@ -282,6 +282,41 @@ class ChatMessage(models.Model):
         return f"Message from {self.sender.full_name} to {self.receiver.full_name} at {self.timestamp}"
 
 
+class Notification(models.Model):
+    class Type(models.TextChoices):
+        NEW_BOOKING = 'NEW_BOOKING', 'New booking'
+        BOOKING_CONFIRMED = 'BOOKING_CONFIRMED', 'Booking confirmed'
+        BOOKING_REJECTED = 'BOOKING_REJECTED', 'Booking rejected'
+        NEW_MESSAGE = 'NEW_MESSAGE', 'New message'
+        NEW_REVIEW = 'NEW_REVIEW', 'New review'
+
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='notification_actor',
+    )
+    type = models.CharField(max_length=32, choices=Type.choices)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    link = models.CharField(max_length=1024, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    idempotency_key = models.CharField(max_length=255, unique=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recipient', 'read_at']),
+        ]
+
+    def __str__(self):
+        return f"Notification({self.type}) to {self.recipient_id}"
+
+
 @receiver(post_save, sender=User)
 def create_provider_profile(sender, instance, created, **kwargs):
     if created and instance.role == User.Role.PROVIDER:

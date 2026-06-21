@@ -28,7 +28,6 @@
         }
     }
 
-    
     .dashboard-nav-tabs .nav-link.active {
         background: var(--primary-gradient);
         color: white;
@@ -521,7 +520,7 @@
                                         <span class="text-muted small">Active Chat</span>
                                     </div>
                                 </div>
-                                
+
                                 <div class="chat-messages d-flex flex-column" id="chat-messages-container">
                                     {% if chat_messages %}
                                         {% for msg in chat_messages %}
@@ -539,7 +538,7 @@
                                         </div>
                                     {% endif %}
                                 </div>
-                                
+
                                 <div class="chat-footer">
                                     <form id="chat-form" action="{% url 'send_chat_message' chat_partner.id %}" method="POST">
                                         {% csrf_token %}
@@ -572,6 +571,160 @@
 {% block extra_js %}
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // ---- Notifications (WebSocket + realtime UI) ----
+        (function initNotifications() {
+            var wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            var wsUrl = wsScheme + '://' + window.location.host + '/ws/notifications/';
+
+            var unreadBadge = document.getElementById('notificationsUnreadBadge');
+            var notificationsEmptyState = document.getElementById('notificationsEmptyState');
+            var notificationsList = document.getElementById('notificationsList');
+
+            var unreadCount = 0;
+            var MAX_VISIBLE = 20;
+
+            function setBadge(count) {
+                unreadCount = Math.max(0, parseInt(count || 0, 10));
+                if (!unreadBadge) return;
+                unreadBadge.textContent = unreadCount;
+                unreadBadge.style.display = unreadCount > 0 ? 'inline-flex' : 'none';
+            }
+
+            function formatItem(n) {
+                var isUnread = !n.read_at;
+                var readClass = isUnread ? 'unread' : 'read';
+
+                var li = document.createElement('li');
+                li.className = 'notification-item ' + readClass;
+                li.setAttribute('role', 'button');
+                li.setAttribute('tabindex', '0');
+                li.dataset.notificationId = n.id;
+
+                li.innerHTML =
+                    '<div class="d-flex align-items-start justify-content-between gap-2">' +
+                        '<div>' +
+                            '<div class="notification-title">' + (n.title || 'Notification') + '</div>' +
+                            '<div class="notification-message">' + (n.message || '') + '</div>' +
+                        '</div>' +
+                        '<div class="notification-meta ms-auto">' +
+                            (n.created_at ? new Date(n.created_at).toLocaleString([], {year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit'}) : '') +
+                        '</div>' +
+                    '</div>';
+
+                return li;
+            }
+
+            function renderList(notifications) {
+                if (!notificationsList) return;
+                notificationsList.innerHTML = '';
+
+                var count = 0;
+                (notifications || []).slice(0, MAX_VISIBLE).forEach(function(n) {
+                    if (!n.read_at) count += 1;
+                    notificationsList.appendChild(formatItem(n));
+                });
+
+                setBadge(count);
+                if (notificationsEmptyState) {
+                    notificationsEmptyState.style.display = (notifications || []).length ? 'none' : 'block';
+                }
+            }
+
+            function prependNotification(n) {
+                if (!notificationsList) return;
+
+                var isUnread = !n.read_at;
+                if (isUnread) setBadge(unreadCount + 1);
+
+                if (notificationsEmptyState) notificationsEmptyState.style.display = 'none';
+                notificationsList.insertBefore(formatItem(n), notificationsList.firstChild);
+
+                while (notificationsList.children.length > MAX_VISIBLE) {
+                    notificationsList.removeChild(notificationsList.lastChild);
+                }
+            }
+
+            function getCookie(name) {
+                var cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    var cookies = document.cookie.split(';');
+                    for (var i = 0; i < cookies.length; i++) {
+                        var cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            async function markNotificationRead(id) {
+                try {
+                    var resp = await fetch('/notifications/' + id + '/read/', {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': getCookie('csrftoken')
+                        },
+                        credentials: 'same-origin'
+                    });
+                    var data = await resp.json();
+                    if (data && data.success) {
+                        setBadge(data.unread_count);
+                    }
+                } catch (e) {}
+            }
+
+            function wireItemClick() {
+                if (!notificationsList) return;
+
+                notificationsList.addEventListener('click', function(e) {
+                    var target = e.target.closest && e.target.closest('.notification-item');
+                    if (!target) return;
+
+                    var id = target.dataset.notificationId;
+                    if (!id) return;
+                    if (target.classList.contains('read')) return;
+
+                    // Update UI immediately (click-only)
+                    target.classList.remove('unread');
+                    target.classList.add('read');
+                    setBadge(unreadCount - 1);
+
+                    markNotificationRead(id);
+                });
+
+                notificationsList.addEventListener('keydown', function(e) {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    var target = e.target.closest && e.target.closest('.notification-item');
+                    if (!target) return;
+                    e.preventDefault();
+                    target.click();
+                });
+            }
+
+            wireItemClick();
+
+            var socket = new WebSocket(wsUrl);
+            socket.onopen = function() {
+                socket.send(JSON.stringify({ action: 'get_latest' }));
+            };
+
+            socket.onmessage = function(event) {
+                try {
+                    var msg = JSON.parse(event.data);
+                    if (!msg || !msg.type) return;
+
+                    if (msg.type === 'notifications.latest') {
+                        renderList(msg.notifications || []);
+                    } else if (msg.type === 'notifications.new') {
+                        prependNotification(msg.notification);
+                    }
+                } catch (e) {}
+            };
+        })();
+
         // Automatically scroll chat window to bottom
         var chatContainer = document.getElementById("chat-messages-container");
         if (chatContainer) {
@@ -604,7 +757,6 @@
             var container = document.getElementById('chat-messages-container');
             if (!container) return;
 
-            // If initial UI had "No messages yet" placeholder, remove it.
             var placeholder = container.querySelector('.my-auto');
             if (placeholder) placeholder.remove();
 

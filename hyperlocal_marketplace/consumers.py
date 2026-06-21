@@ -4,11 +4,15 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 from .accounts.models import ChatMessage
+from .accounts.notifications import create_notification_and_dispatch
+
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
+
     async def connect(self):
         user = self.scope.get("user")
+
         self.partner_id = int(self.scope['url_route']['kwargs']['partner_id'])
         self.room_group_name = self._make_room_group_name(user.id, self.partner_id)
 
@@ -50,7 +54,23 @@ class ChatConsumer(AsyncWebsocketConsumer):
         a, b = sorted([int(user_id), int(partner_id)])
         return f"chat__{a}__{b}"
 
+    @database_sync_to_async
+    def _dispatch_new_message_notification(self, chat_message: ChatMessage):
+        # Deterministic idempotency: one notification per chat message.
+        recipient = chat_message.receiver
+        actor = chat_message.sender
+        create_notification_and_dispatch(
+            recipient=recipient,
+            actor=actor,
+            type='NEW_MESSAGE',
+            title='New message',
+            message=chat_message.message[:200],
+            link=f"/customer-dashboard/#chat-section",
+            idempotency_key=f"NEW_MESSAGE:{chat_message.id}",
+        )
+
     async def receive(self, text_data=None, bytes_data=None):
+
         if not text_data:
             return
 
@@ -72,7 +92,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             receiver_id=self.partner_id,
             message=message_text,
         )
+
+        # NEW_MESSAGE notification MUST be created only here.
+        await self._dispatch_new_message_notification(chat_message)
+
         message_payload = await self._fetch_message_payload(chat_message)
+
+
+
+
 
         await self.channel_layer.group_send(
             self.room_group_name,

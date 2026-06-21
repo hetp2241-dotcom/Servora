@@ -53,7 +53,27 @@ class CreateReviewView(CustomerRequiredMixin, CreateView):
 
     def form_valid(self, form):
         messages.success(self.request, 'Thanks for sharing your review.')
-        return super().form_valid(form)
+        response = super().form_valid(form)
+
+        # NEW_REVIEW notification (provider receives)
+        booking = self.booking
+        provider = booking.provider
+        review = self.object
+
+        from hyperlocal_marketplace.accounts.notifications import create_notification_and_dispatch
+
+        create_notification_and_dispatch(
+            recipient=provider,
+            actor=self.request.user,
+            type='NEW_REVIEW',
+            title='New review',
+            message=f"You received a new review for booking #{booking.id}.",
+            link=f"/provider-dashboard/#reviews",
+            idempotency_key=f"NEW_REVIEW:{review.id}",
+        )
+
+        return response
+
 
     def form_invalid(self, form):
         messages.error(self.request, 'Please correct the review form errors.')
