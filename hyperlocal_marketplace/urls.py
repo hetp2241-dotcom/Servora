@@ -21,6 +21,7 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/', include('hyperlocal_marketplace.api_urls')),
     path('reviews/', include('hyperlocal_marketplace.reviews.urls')),
     path('', include('hyperlocal_marketplace.accounts.urls')),
 ]

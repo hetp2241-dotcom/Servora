@@ -91,15 +91,60 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+# Channels / WebSockets
+# Default to Redis, but allow local development to work without a running Redis server.
+# Requirement: keep Redis support intact for non-local environments.
+# If Redis is not running (common for local development), fall back to InMemoryChannelLayer.
+# Keep Redis as default, but auto-fallback when in DEBUG and Redis isn't reachable.
+USE_INMEMORY_CHANNEL_LAYER = os.getenv("USE_INMEMORY_CHANNEL_LAYER", "").strip().lower() in {"1", "true", "yes"}
+
+if DEBUG and (USE_INMEMORY_CHANNEL_LAYER or "AUTO" == os.getenv("USE_INMEMORY_CHANNEL_LAYER_AUTO", "AUTO")):
+    try:
+        import redis  # imported only to probe availability
+
+        _r = redis.Redis(host="127.0.0.1", port=6379)
+        _r.ping()
+        _redis_ok = True
+    except Exception:
+        _redis_ok = False
+
+    if not _redis_ok:
+        CHANNEL_LAYERS = {
+            "default": {
+                "BACKEND": "channels.layers.InMemoryChannelLayer",
+            },
+        }
+    else:
+        CHANNEL_LAYERS = {
+            "default": {
+                "BACKEND": "channels_redis.core.RedisChannelLayer",
+                "CONFIG": {
+                    "hosts": [("127.0.0.1", 6379)],
+                },
+            },
+        }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [("127.0.0.1", 6379)],
+            },
         },
-    },
-}
-ALLOWED_HOSTS = ["*"]
+    }
+
+
+
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+]
+
+# React/Vite dev server (session-auth + CSRF) origin trust.
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
 
 # Password validation
@@ -114,7 +159,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
+    },  
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },

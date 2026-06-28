@@ -5,3 +5,5 @@
 - [x] Update `provider_profile_list.html` to read `profile.average_rating`, `profile.review_count`, `profile.jobs_completed`.
 - [ ] Quick sanity check: ensure pages render without `get_item` usage.
 
+- [ ] Replace placeholder provider + service images (downloaded offline into `assets/`, then run `python manage.py replace_placeholder_images`).
+
