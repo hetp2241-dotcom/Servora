@@ -10,4 +10,16 @@ export interface Payment { id: number; booking_id: number; amount: string; payme
 export interface Booking { id: number; booking_date: string; notes: string; status: string; status_label: string; created_at: string; service: { id: number; name: string; price: string }; customer: { id: number; full_name: string }; provider: { id: number; full_name: string }; payment: Payment | null; has_review: boolean; review_id: number | null }
 export interface Review { id: number; booking_id: number; service: { id: number; name: string }; customer: { id: number; full_name: string }; provider: { id: number; full_name: string }; rating: number; comment: string; created_at: string; updated_at: string }
 export interface Notification { id: number; type: string; title: string; message: string; link: string; created_at: string; read_at: string | null; actor?: { id: number; full_name: string } | null }
-export interface ChatMessage { id: number; sender_id: number; receiver_id: number; message: string; timestamp: string }
+export interface ChatMessage {
+  id: number;
+  sender_id: number;
+  receiver_id: number;
+  message: string;
+  timestamp: string;
+  delivered_at: string | null;
+  seen_at: string | null;
+  attachment_url: string;
+  attachment_name: string;
+  attachment_type: string;
+  attachment_size: number;
+}
